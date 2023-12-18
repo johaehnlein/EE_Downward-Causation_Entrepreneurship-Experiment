@@ -1,0 +1,360 @@
+<<<<<<< HEAD
+---
+title: "EE_Downward-Causation_Conjoint"
+author: "Johannes Haehnlein"
+date: "`r Sys.Date()`"
+output: html_document
+theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+The following workflow analyzes the collected data of a conjoint experiment downward causation in entrepreneurial ecosystems. Downward causation is a key mechanism for understanding how EEs evolve and become self-sustaining by creating feedback loops and reinforcing themselves (Spigel, 2017; Thompson et al., 2018; Wurth et al., 2021). However, despite the importance and potential of downward causation in EEs, research on how to stimulate it remains largely obscured (Mason & Harrison, 2006; Wurth et al., 2021). Based on SET, we propose a conceptual model that examines the likelihood of EE contribution behavior as a potential function of six constructs. We propose that entrepreneurs are more likely to contribute to an EE if they have experienced support from the EE or its actors (H1), if they have strong personal relationships with other actors in the EE (H2), if they feel affiliated with the EE (H3), if they have altruistic motivation (H4), if they expect a benefit from their contribution behavior (H5) and if they perceive a potential benefit for the overall EE (H6). To investigate the proposed hypothesis we adopt a metric conjoint experiment. The data collection followed an attribute-driven and fractional factorial design, in which participants are asked to rate their likelihood of engaging in contribution behavior based on a set of hypothetical profiles that vary in terms of the six introduced attributes, each manipulated at two levels (Aiman-Smith et al., 2002; Shepherd & Zacharakis, 2018). The subsequent workflow uses established measurements and recommendations to analyze conjoint experiments (Schueler et al., 2023; Zhu et al., 2021, Shepherd & Zacharakis, 2018).
+
+### Workflow Steps
+
+### Sampled Data
+
+In our study, we were explicitly interested in factors influencing the decision-making of contribution behavior. Social Exchange Theory was used as a theoretical framework to develop a model, which examines the likelihood of EE contribution behavior as a function of six constructs: reciprocity, personal relationships, affiliation, altruism, rationality, and group gain. In our conjoint experiment. Each attribute can take either a high or low level, resulting in 64 possible profiles. To reduce the number of profiles and avoid multicollinearity, we applied a fractional factorial design reducing the amount of profiles to eight.  The profiles were presented to the participants within a realistic scenario, in which they are approached by a representative of a startup center who wants to get them more involved in the EE in their region by offering them various contribution opportunities such as mentoring, coaching, guest lecturing, or keynote speaking. The participants are asked to rate their likelihood of accepting each profile on a 7-point Likert scale ranging from 1 (very unlikely) to 7 (very likely). The dependent variable is the likelihood of EE contribution behavior. After a first rating round of the eight profiles, the randomized profiles were replicated in a second round. 
+
+We applied a purposive sampling approach focusing on entrepreneurs who have originated from an EE and are anticipated to induce downward causation. Following this framework, we target entrepreneurs who have been supported by public funding programs (e.g., EXIST in Germany) or who have been located in startup centers or participated in incubation or acceleration programs. We collected the data in two waves.
+
+First, we approached the potential participants for our main study through various channels, such as LinkedIn and several supporting institutions from all over Germany, such as universities, incubators, and startup centers. This resulted in 90 responding entrepreneurs. Secondly we used the Prolific online survey platform, assigning the same sampling criteria. This led to additional 100 respondents. 
+
+***
+
+# Libraries
+
+
+```{r}
+library(openxlsx) # Used to import and export excel files
+library(tidyverse) # Used to load all tidyverse packages
+library(lavaan) # Used to perform confirmatory factor analyses
+library(psych) # Used to calculate Cronbach's Alpha and ICC values
+library(apaTables) # Used to create correlation tables
+library(lmerTest) # Used for multilevel regression adding p-values to the lme4 package
+library(broom.mixed) # Used to tidy result objects
+library(parameters) # Used to augement regression analyses
+library(performance) # Used to  obtain R2 for multilevel models
+library(flextable) # Used for table creation
+library(knitr) # Used for table creation
+```
+
+# Data
+
+## Read Data
+
+```{r}
+data <- read.xlsx("Data_EE Downward Causation_Conjoint_Wave1.xlsx")
+```
+
+## Inspect Data
+
+### Code Book
+
+* age = Age of the subject
+* gender = Gender of the subject
+* education = Highest education grade
+* busexp = Years of business experience of the entrepreneur
+* compfound = Respondent being an entrepreneur
+* amountfound = Amount fo founded companies
+* compage = Years since (last) startup foundation
+* compact = Ongoing activity of the entrepreneur in his startup
+* role = Function of the entrepreneur in his startup
+* compcity = city of company headquarters
+* amountemp = Amount of emplyees in the entrepreneurs startup
+* pubfund = public funding by a funding program in germany
+* programpart = Participation in an accleration or incubation program
+* startupcenter = Being in located in a startup or technology center
+* eecontlikex = Conjoint Card 1-8 (Assessment of likelihood to engage in the EE contribution behavior)
+* eecontlikexRep = Replication Conjoint Card 1-8 (Assessment of likelihood to engage in the EE contribution behavior)
+* ee_support_reception = Perceived EE support
+* ee_affiliation = Affiliation to the EE
+* ee_relationships = Personal Relationship to EE actors
+* altruism_potential = Altruistic potential
+* positive_outcome_expectation = Expected positive outcome of the activity
+* benefit_perception = Perceived benefits of the entrepreneur
+* scenexp = Experience of the described scenario
+* scenpract = Practicability of the described scenario
+* studreal = Realism of the described study
+* critund = Understandability of decision criteria
+* fun = Fun factor of the study
+* ipfinvx = Intense Positive Feeling towards inventing (4 items)
+* ipffndx = Intense Positive Feeling towards founding (3 items)
+* ipfdev = Intense Positive Feeling towards developing (3 items)
+* esex = Entrepreneurial Self-Efficacy (4 items)
+* ic_inv = Identity Centrality inventing
+* ic_fnd = Identity Centrality founding
+* ic_dev = Identity Centrality developing
+* ex_orx = Exchange Orientation (9 items)
+* selfintx = Self-Interest (3 items)
+* othorix = Other Orientation (3 Items)
+* gentrustx = General Trust Scale (6 Items)
+* bogusx = Bogus Item 1 & 3
+* sudoku = Bogus Item 2
+* duration = time to complete survey (min)
+
+### Variable names
+
+```{r}
+colnames(data)
+```
+
+# Data Preparation for Analysis
+
+## Harmonize Variable Names
+
+```{r}
+data <- data |>
+  rename_all(.funs = tolower) |> # Convert all column names to lower case
+  rename("role" = "function") |> # Convert variable "function" to "role"
+  rowid_to_column(var = "respondent_id") # Create id column
+```
+
+## Remove effortless responses
+
+In order to ensure data quality, respondents with low survey engagement shall be removed from the sample. To check these effortless respondents, we included three bogus items (attention checks) in our survey. We remove all respondents who failed the bogus. Also we remove respondents, who finished the survey too fast or too slow. Based on the survey's pre-test the estimated completion time was between 12 and 20 minutes. According to this, we will remove all respondents, who completed the survey in less than 8 minutes and in more than 40 minutes.
+
+### Remove failed bogus item responses
+
+```{r}
+data <- filter(data, bogus1 == 6) # Remove all respondent failing bogus item 1
+data <- filter(data, sudoku == 4) # Remove all respondent failing bogus item 2
+data <- filter(data, bogus3 == 4) # Remove all respondent failing bogus item 3
+```
+
+### Remove too fast or too slow conducting respondents
+
+```{r}
+duration_lower <- 8 # response time lower than 8 minutes
+duration_higher <- 40 # response time higher than 40 minutes
+```
+
+```{r}
+time_out_lower <- data |>
+  filter(duration > duration_lower) |>
+  nrow()
+```
+
+```{r}
+time_out_higher <- data |>
+  filter(duration < duration_higher) |>
+  nrow()
+```
+
+```{r}
+data <- data |>
+  filter(duration >= duration_lower) |>
+  filter(duration <= duration_higher)
+```
+
+### Sample Size (Wave 1)
+
+```{r}
+nrow(data)
+```
+
+
+# Sample demographics and descriptive data
+
+As part of our survey we collected several demographic data of the participating entrepreneurs as well as information about their personal and business background). Subsequently we select the respective data, process them to the correct formats and labels and create visualizations of the data to get an overview and summarizing information of our sample set.   
+
+```{r}
+demographics <- select(data, "age", "gender", "education", "busexp", "amountfound", "compage", "compact", "education", "role", "compcity", "amountemp", "pubfund", "programpart", "startupcenter")
+```
+
+## Processing and summarizing numerical variables
+
+```{r}
+
+# Calculate means, medians, sds, mins and maxs of numerical variables 
+
+numerical_vars <- demographics |>
+  select(age, busexp, amountfound, compage, amountemp) |>
+  summarise_all(list(mean = ~round(mean(., na.rm = TRUE), 2), 
+                     median = ~round(median(., na.rm = TRUE), 2), 
+                     sd = ~round(sd(., na.rm = TRUE), 2), 
+                     min = ~round(min(., na.rm = TRUE), 2), 
+                     max = ~round(max(., na.rm = TRUE), 2)))
+
+
+# Reshape the data
+numerical_summary_long <- numerical_vars |>
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value") |>
+  separate(variable, into = c("variable", "statistic"), sep = "_") |>
+  pivot_wider(names_from = variable, values_from = value) |>
+  relocate(statistic, .before = 1)  
+
+# Creation and Export of flextable
+
+numerical_summary_table <- flextable(numerical_summary_long) |>
+    set_header_labels(
+    statistic = "Statistic",
+    age = "Age",
+    busexp = "Business Experience",
+    amountfound = "Companies Founded",
+    compage = "Company Age",
+    amountemp = "Number of Employees") |>
+  set_formatter(
+    Age = ~format(round(., 2), nsmall = 2),
+    "Business Experience" = ~format(round(., 2), nsmall = 2),
+    "Companies Founded" = ~format(round(., 2), nsmall = 2),
+    "Company Age" = ~format(round(., 2), nsmall = 2),
+    "Number of Employees" = ~format(round(., 2), nsmall = 2)) |>
+  set_table_properties(layout = "autofit") |>
+  color(part = "header", color = "white") |>
+  bg(part = "header", bg = "gray") |>
+  align(align = "center", part = "all")
+
+print(numerical_summary_table)
+```
+
+## Processing and summarizing categorical variables
+
+```{r}
+
+# Modify the dataframe to include categorical labels instead of coded numerical lables
+
+demographics <- demographics |>
+  mutate(
+    gender = case_when(
+      gender == 1 ~ "female",
+      gender == 2 ~ "male",
+      gender == 3 ~ "diverse"),
+    education = case_when(
+      education == 1 ~ "Lower Secondary Education",
+      education == 2 ~ "O-level",
+      education == 3 ~ "university of applied sciences entrance qualification",
+      education == 4 ~ "higher education entrance qualification",
+      education == 5 ~ "completed vocational training",
+      education == 6 ~ "university degree",
+      education == 7 ~ "Ph.D."),
+    role = case_when(
+      role == 1 ~ "CEO",
+      role == 2 ~ "CTO",
+      role == 3 ~ "COO",
+      role == 4 ~ "CFO",
+      role == 5 ~ "CMO",
+      role == 6 ~ "General Manager",
+      role == 8 ~ "Director",
+      role == 9 ~ "Teamlead",
+      role == 10 ~ "Other"),
+    compact = if_else(compact == 1, "yes", "no"),
+    pubfund = if_else(pubfund == 1, "yes", "no"),
+    programpart = if_else(programpart == 1, "yes", "no"),
+    startupcenter = if_else(startupcenter == 1, "yes", "no")
+    )
+
+# Calculate frequencies and percentages of the variables rounded to two decimals    
+
+categorical_vars <- c("gender", "education", "compact", "role", 
+                      "compcity", "pubfund", "programpart", "startupcenter")
+categorical_summary_list <- list()
+
+for (var in categorical_vars) {
+  cat_var_table <- demographics |>
+    count(!!sym(var)) |>
+    mutate(percentage = round(n / sum(n) * 100, 2)) |>
+    arrange(desc(n))
+
+  categorical_summary_list[[var]] <- cat_var_table
+}
+
+
+# Creation of a flextable
+
+for (var in names(categorical_summary_list)) {
+  cat_table <- flextable(categorical_summary_list[[var]]) %>%
+    set_table_properties(layout = "autofit") %>%
+    color(part = "header", color = "white") %>%
+    bg(part = "header", bg = "gray") %>%
+    align(align = "center", part = "all") %>%
+    autofit()
+
+  print(cat_table)
+}
+
+```
+
+
+# Analysis of measured variables
+
+To control the findings of our conjoint experiment with different potential influencing factors, we included the earlier described demographic information as well as different constructs, that theoretically could have a moderating influence. These latent variables are:
+
+- General Trust Scale explained by 6 items (Yamagishi & Yamagishi, 1994)
+- Self-Interest explained by 3 items (De Dreu & Nauta, 2009)
+- Other Orientation explained by 3 items (De Dreu & Nauta, 2009)
+- Exchange Orientation explained by 9 items (Clark & Mills, 2012)
+- Entrepreneurial Self-Efficacy explained by 4 items (Zhao et al., 2005)
+- Entrepreneurial Passion by passion for inventing (explained by 4 items for intense positive feelings towards inventing and 1 item for identity centrality for inventing), passion for founding (explained by 3 items for intense positive feelings towards founding and 1 item for identity centrality for founding) and passion for developing (explained by 3 items for intense positive feelings towards developing and 1 item for identity centrality for developing) (Cardon et al. 2013)
+
+## Confirmatory factor analysis
+
+Subsequently we conduct a confirmatory factor analysis (CFA) to evaluate the factor loadings on the latent vaiables and to test the model fit.
+
+### Description of CFA model
+
+
+```{r}
+
+data <- data |>
+  mutate(  exor3 = 6 - exor3,
+    exor4 = 8 - exor4,
+    exor5 = 8 - exor5,
+    exor9 = 8 - exor9
+  )
+
+cfa_model <- "gen_trust =~ gentrust1 + gentrust2 + gentrust1 + gentrust4 + gentrust5 + gentrust6
+              self_int =~ selfint1 + selfint2 + selfint3
+              oth_ori =~ othori1 + othori2 + othori3
+              ex_or =~ exor1 + exor2 + exor3 + exor4 + exor5 + exor6 + exor7 + exor8 + exor9
+              ese =~ ese1 + ese2 + ese3 + ese4"
+                
+```
+
+
+
+### Model fit information
+
+```{r}
+
+cfa_fit <- cfa(cfa_model, data = data)
+
+summary(cfa_fit, fit.measures = TRUE)
+
+```
+
+### Standardization of results
+
+```{r}
+
+cfa_fit <- standardizedsolution(cfa_fit)
+
+```
+
+### CFA: Results Overview in a table
+
+```{r}
+
+cfa_fit <- cfa_fit |>
+  filter(op == "=~") |>
+  select(latent_var = lhs, indicators = rhs, std_loading = est.std ) |>
+  mutate(std_loading = round(std_loading, 2))
+
+cfa_fit_table <- flextable(cfa_fit) |>
+  autofit() |>
+  color(part = "header", color = "white") |>
+  bg(part = "header", bg = "gray") |>
+  align(align = "center", part = "all") |>
+  fontsize(size = 12, part = "all")
+
+```
+
+```{r}
+
+```
+
