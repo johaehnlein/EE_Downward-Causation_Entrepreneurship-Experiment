@@ -312,7 +312,17 @@ cfa_model <- "gen_trust =~ gentrust1 + gentrust2 + gentrust1 + gentrust4 + gentr
               self_int =~ selfint1 + selfint2 + selfint3
               oth_ori =~ othori1 + othori2 + othori3
               ex_or =~ exor1 + exor2 + exor3 + exor4 + exor5 + exor6 + exor7 + exor8 + exor9
-              ese =~ ese1 + ese2 + ese3 + ese4"
+              ese =~ ese1 + ese2 + ese3 + ese4
+              ipf_inv =~ ipfinv1 + ipfinv2 + ipfinv3 + ipfinv4
+              ic_inv =~ ic_icinv
+              ipf_fnd =~ ipffnd1 + ipffnd2 + ipffnd3 + ipffnd1
+              ic_fnd =~ ic_icfnd
+              ipf_dev =~ ipfdev1 + ipfdev2 + ipfdev3
+              ic_dev =~ ic_icdev
+              ep_inv =~ ipf_inv + ic_inv
+              ep_fnd =~ ipf_fnd + ic_fnd
+              ep_dev =~ ipf_dev +   ic_dev
+              ep =~ ep_inv + ep_fnd + ep_dev"
                 
 ```
 
@@ -334,6 +344,8 @@ summary(cfa_fit, fit.measures = TRUE)
 
 cfa_fit <- standardizedsolution(cfa_fit)
 
+summary(cfa_fit, fit.measures = TRUE)
+
 ```
 
 ### CFA: Results Overview in a table
@@ -352,9 +364,11 @@ cfa_fit_table <- flextable(cfa_fit) |>
   align(align = "center", part = "all") |>
   fontsize(size = 12, part = "all")
 
+print(cfa_fit_table)
+
 ```
 
 ```{r}
-test
+
 ```
 
