@@ -42,6 +42,8 @@ library(parameters) # Used to augement regression analyses
 library(performance) # Used to  obtain R2 for multilevel models
 library(flextable) # Used for table creation
 library(knitr) # Used for table creation
+library(clubSandwich) # Used for cluster robust standard errors
+library(sandwich) # Used for cluster robust standard errors
 ```
 
 # Data
@@ -66,12 +68,12 @@ data <- read.xlsx("Data_EE Downward Causation_Conjoint_Wave1.xlsx")
 * compact = Ongoing activity of the entrepreneur in his startup
 * role = Function of the entrepreneur in his startup
 * compcity = city of company headquarters
-* amountemp = Amount of emplyees in the entrepreneurs startup
+* amountemp = Amount of employees in the entrepreneurs startup
 * pubfund = public funding by a funding program in germany
 * programpart = Participation in an accleration or incubation program
 * startupcenter = Being in located in a startup or technology center
-* eecontlikex = Conjoint Card 1-8 (Assessment of likelihood to engage in the EE contribution behavior)
-* eecontlikexRep = Replication Conjoint Card 1-8 (Assessment of likelihood to engage in the EE contribution behavior)
+* eecontlik = Conjoint Card 1-8 (Assessment of likelihood to engage in the EE contribution behavior)
+* eecontlikrep = Replication Conjoint Card 1-8 (Assessment of likelihood to engage in the EE contribution behavior)
 * ee_support_reception = Perceived EE support
 * ee_affiliation = Affiliation to the EE
 * ee_relationships = Personal Relationship to EE actors
@@ -112,6 +114,9 @@ colnames(data)
 data <- data |>
   rename_all(.funs = tolower) |> # Convert all column names to lower case
   rename("role" = "function") |> # Convert variable "function" to "role"
+  rename("icfnd" = "ic_icfnd") |>
+  rename("icdev" = "ic_icdev") |>
+  rename("icinv" = "ic_icinv") |>
   rowid_to_column(var = "respondent_id") # Create id column
 ```
 
@@ -314,11 +319,11 @@ cfa_model <- "gen_trust =~ gentrust1 + gentrust2 + gentrust1 + gentrust4 + gentr
               ex_or =~ exor1 + exor2 + exor3 + exor4 + exor5 + exor6 + exor7 + exor8 + exor9
               ese =~ ese1 + ese2 + ese3 + ese4
               ipf_inv =~ ipfinv1 + ipfinv2 + ipfinv3 + ipfinv4
-              ic_inv =~ ic_icinv
+              ic_inv =~ icinv
               ipf_fnd =~ ipffnd1 + ipffnd2 + ipffnd3 + ipffnd1
-              ic_fnd =~ ic_icfnd
+              ic_fnd =~ icfnd
               ipf_dev =~ ipfdev1 + ipfdev2 + ipfdev3
-              ic_dev =~ ic_icdev
+              ic_dev =~ icdev
               ep_inv =~ ipf_inv + ic_inv
               ep_fnd =~ ipf_fnd + ic_fnd
               ep_dev =~ ipf_dev +   ic_dev
@@ -368,7 +373,325 @@ print(cfa_fit_table)
 
 ```
 
+## Aggregation of indicators to composites
+
+### Calculating the composites
+
 ```{r}
+data <- data |>
+  rowwise() |>
+  mutate(gen_trust = mean(c(gentrust1, gentrust2, gentrust3, gentrust4, gentrust5, gentrust6))) |>
+  mutate(self_int = mean(c(selfint1, selfint2, selfint3))) |>
+  mutate(oth_ori = mean(c(othori1, othori2, othori3))) |>
+  mutate(ex_or = mean(c(exor1, exor2, exor3, exor4, exor5, exor6, exor7, exor8, exor9))) |>
+  mutate(ese = mean(c(ese1, ese2, ese3, ese4))) |>
+  mutate(ipf_inv = mean(c(ipfinv1, ipfinv2, ipfinv3, ipfinv4))) |>
+  mutate(ic_inv = mean(c(icinv))) |>
+  mutate(ipf_dev = mean(c(ipfdev1, ipfdev2, ipfdev3))) |>
+  mutate(ic_dev = mean(c(icdev))) |>
+  mutate(ipf_fnd = mean(c(ipffnd1, ipffnd2, ipffnd3))) |>
+  mutate(ic_fnd = mean(c(icfnd))) |>
+  mutate(ep_inv = mean(c(ipf_inv, ic_inv))) |>
+  mutate(ep_fnd = mean(c(ipf_fnd, ic_fnd))) |>
+  mutate(ep_dev = mean(c(ipf_dev, ic_dev))) |>
+  mutate(ep = mean(c(ep_inv, ep_fnd, ep_dev))) |>
+  ungroup()
+  
+```
+
+### Removing the indicators from the dataset
+
+```{r}
+
+data <- data |>
+  select(-c(gentrust1, gentrust2, gentrust3, gentrust4, gentrust5, gentrust6)) |>
+  select(-c(selfint1, selfint2, selfint3)) |>
+  select(-c(othori1, othori2, othori3)) |>
+  select(-c(exor1, exor2, exor3, exor4, exor5, exor6, exor7, exor8, exor9)) |>
+  select(-c(ese1, ese2, ese3, ese4)) |>
+  select(-c(ipfinv1, ipfinv2, ipfinv3, ipfinv4)) |>
+  select(-c(icinv)) |>
+  select(-c(ipfdev1, ipfdev2, ipfdev3)) |>
+  select(-c(icdev)) |>
+  select(-c(ipffnd1, ipffnd2, ipffnd3)) |>
+  select(-c(icfnd)) 
 
 ```
 
+# Conjoint experiment
+
+## Fractional Factorial Design 
+
+Here, we provide you with the factorial design of this conjoint study: Subsequently the factorial design of the conducted conjoint study will be explained: 
+
+  * 6 attributes
+    **ee_support_reception = Perceived EE support
+    **ee_affiliation = Affiliation to the EE
+    **ee_relationships = Personal Relationship to EE actors
+    **altruism_potential = Altruistic potential
+    **positive_outcome_expectation = Expected positive outcome of the activity
+    **benefit_perception = Perceived benefits of the entrepreneur
+  * 2 levels per attribute (0 = low; 1 = high)
+  * Fractional design with main-effects only  -> 8 profiles
+  * Full replication of all 8 profiles -> 16 profiles
+  * Dependent variable = eecontlikex = likelihood to engage in the EE contribution behavior
+
+```{r}
+# Levels of all 8 profiles (Orthoplan)
+
+profiles <- tibble(
+  profile = c(1, 2, 3, 4, 5, 6, 7, 8),
+  ee_support_reception = c(1, 0, 1, 0, 0, 1, 0, 1),
+  ee_affiliation = c(0, 1, 1, 0, 1, 0, 0, 1),
+  ee_relationships = c(0, 1, 0, 0, 0, 1, 1, 1),
+  altruism_potential = c(0, 0, 1, 1, 0, 0, 1, 1),
+  positive_outcome_expectation = c(0, 0, 0, 1, 1, 1, 0, 1),
+  benefit_perception = c(1, 1, 0, 1, 0, 0, 0, 1)
+)
+```
+
+### First round of data collection in the conjoint experiment
+
+  *Included variables:
+    **respondent_id
+    **age
+    **gender
+    **pubfund
+    **programpart
+    **startupcenter
+    **eecontlike1 to eecontlike8
+
+
+```{r}
+
+first_round_data <- data |>
+  select(1:3, 13:15, 17:24) # Selecting data from first collection round
+
+first_round_data <- first_round_data |>
+  pivot_longer(!c(1:6), # pivoting the data set to a long format
+    names_to = "profile", # bringing profile numbers to profile column
+    values_to = "eecontlike") |> # bringing eecontlike values to eecontlike column
+  mutate(profile = as.numeric(str_extract(profile, "\\-*\\d+\\.*\\d*"))) |> # saving numeric values of profile numbers into the profile column
+  mutate(round_id = 1) |> # adding round 1 id
+  relocate(round_id, profile, eecontlike, .after = respondent_id) # adjusting column order
+
+```
+
+### Second round of data collection in the conjoint experiment
+
+  *Included variables:
+    **respondent_id
+    **age
+    **gender
+    **pubfund
+    **programpart
+    **startupcenter
+    **eecontlike1rep to eecontlike8rep
+    ** [CFA Factors]
+
+
+```{r}
+
+second_round_data <- data |>
+  select(1:3, 13:15, 26:33) # Selecting data from second collection round
+
+second_round_data <- second_round_data |>
+  pivot_longer(!c(1:6), # pivoting the data set to a long format
+    names_to = "profile", # bringing profile numbers to profile column
+    values_to = "eecontlike") |> # bringing eecontlike values to eecontlike column
+  mutate(profile = as.numeric(str_extract(profile, "\\-*\\d+\\.*\\d*"))) |> # saving numeric values of profile numbers into the profile column
+  mutate(round_id = 2) |> # adding round 1 id
+  relocate(round_id, profile, eecontlike, .after = respondent_id) # adjusting column order
+
+```
+
+### Merging both reounds of data collection
+
+```{r}
+data <- rbind(first_round_data, second_round_data)
+```
+
+### Merging factorial design
+
+```{r}
+data <- left_join(data, profiles, by = "profile") |> #adding profiles to data set
+  relocate("ee_support_reception", "ee_affiliation", "ee_relationships", "altruism_potential", "positive_outcome_expectation", "benefit_perception", .after = "profile") #relocating attributes in the data set
+
+```
+
+### Converting id and round variables from a numeric format into factors
+
+```{r}
+
+data <- data |>
+   mutate(respondent_id = as_factor(respondent_id)) |>
+   mutate(round_id = as_factor(round_id))
+
+```
+
+## Correlation Table
+
+The correlation table of the model includes the dependent variable, controls as well as significant factors from the CFA. These are:
+
+  *eecontlike
+  *age
+  *gender
+  *pubfund
+  *programpart
+  *startupcenter
+  *[CFA Factors]
+
+
+```{r}
+
+data |>
+  select(eecontlike, age, gender, pubfund, programpart, startupcenter) |> #selecting variables
+  apa.cor.table() #creation of correlation matrix
+
+```
+
+## Regression Model
+
+The following regression modell represents a multilevel modell, as conjoint profiles were answered twice in two seperat rounds. 
+
+We will include the earlier specified and listed variables.
+
+
+### Model fitting
+
+The linear regression model includes the following variables:
+
+* Dependent variable: eecontlike = likelihood to engage in the EE contribution behavior
+* Independent variables:
+    **ee_support_reception = Perceived EE support
+    **ee_affiliation = Affiliation to the EE
+    **ee_relationships = Personal Relationship to EE actors
+    **altruism_potential = Altruistic potential
+    **positive_outcome_expectation = Expected positive outcome of the activity
+    **benefit_perception = Perceived benefits of the entrepreneur
+* Control variables:
+    **age
+    **gender
+    **pubfund
+    **programpart
+    **startupcenter
+    **[CFA Factors]
+* Nesting variable: respondent_id
+
+```{r}
+
+res <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + positive_outcome_expectation + benefit_perception + age + gender + pubfund + programpart + startupcenter + (1|respondent_id), REML = TRUE, data = data)
+
+```
+
+
+### Extracting Model Fit
+
+
+```{r}
+
+model_fit <- glance(res) # Extracting model fit
+
+r2 <- r2_nakagawa(res, by_group = TRUE) # Computing R2
+
+icc <- icc(res, by_group = TRUE) # Computing ICC 
+
+# Creation of a fit table 
+model_fit <- tibble(
+  Variable = c(
+    "R2 Level 1",
+    "R2 Level 2",
+    "ICC",
+    "Sigma",
+    "Decisions",
+    "Respondents"),
+      "B (β)" = c(
+         round(r2$R2[1], 2),
+         round(r2$R2[2], 2),
+         round(icc$ICC[1],2),
+        round(model_fit$sigma, 3),
+        model_fit$nobs, length(unique(data$respondent_id))),
+    SE = c(NA_real_, NA_real_, NA_real_, NA_real_, NA_real_, NA_real_),
+    `t-ratio` = c(NA_real_, NA_real_, NA_real_, NA_real_, NA_real_, NA_real_),
+     `p-value` = c(NA_real_, NA_real_, NA_real_, NA_real_, NA_real_, NA_real_)
+)
+```
+
+### Standardize Coefficients
+
+Subsequently we compute the standardized regression coefficients:
+
+```{r}
+# Obtaining standardized parameters
+res_std <- standardize_parameters(res, method = "posthoc")
+
+# Selecting standardized coefficients (rounded to 2 digits)
+
+regression_std <- res_std |>
+  select(Std_Coefficient) |>
+  mutate(Std_Coefficient = round(Std_Coefficient, 2))
+
+```
+
+### Cluster Robust Standard Errors
+
+Subsequently we compute the cluster robust standard errors (SE) to allow for correlation between observations within clusters. This means we nest the 16 responses per respondent within respondent_ids.
+
+Use the the "model_parameters" function ("parameters" package) to obtain cluster robust standard errors:
+
+* vcov should be "vcovCR"
+* vcov_args pick "CR1" for type and "dat$respondent_id" for cluster
+
+```{r}
+res <- model_parameters(res,
+                        vcov = "vcovCR",
+                        vcov_args = list(type = "CR1", cluster = data$respondent_id)
+                        ) 
+
+head(res)
+
+```
+
+## Prepring final output
+
+```{r}
+# Creating coefficient variable
+res <- res |>
+  mutate("B (β)" = paste0(B, " (", Std_Coefficient, ")")) |>
+  select(-c(B, Std_Coefficient)) |>
+  relocate("B (β)", .after = Variable)
+
+# Combining result and fit tables
+res <- rbind(res, fit)
+
+# Renaming variables
+res <- res |>
+  mutate(Variable = if_else(Variable == "(Intercept)", "Intercept", Variable)) |>
+  mutate(Variable = if_else(Variable == "ee_support_reception", "Perceived EE support", Variable)) |>
+  mutate(Variable = if_else(Variable == "ee_affiliation", "Affiliation to the EE", Variable)) |>
+  mutate(Variable = if_else(Variable == "ee_relationships", "Personal Relationship to EE actors", Variable)) |>
+  mutate(Variable = if_else(Variable == "altruism_potential", "Altruistic potential", Variable)) |>
+  mutate(Variable = if_else(Variable == "positive_outcome_expectation", "Expected positive outcome", Variable)) |>
+  mutate(Variable = if_else(Variable == "benefit_perception", "Perceived benefits", Variable)) |>
+  mutate(Variable = if_else(Variable == "age", "Age", Variable)) |>
+  mutate(Variable = if_else(Variable == "gender", "Gender", Variable)) |>
+  mutate(Variable = if_else(Variable == "pubfund", "Publicly funded", Variable)) |> 
+  mutate(Variable = if_else(Variable == "programpart", "Program participation", Variable)) |>
+  mutate(Variable = if_else(Variable == "startupcenter", "Startup center", Variable)) |>
+ 
+```
+
+## Displaying Table
+
+Use the flextable package to create a table with chained pipes:
+
+* The "autofit()" function may come in handy
+* Use "align" to right flush text of the 2nd column in the header
+* Use "align" to right flush text of the 2nd column in the body
+* Put a horizontal line below the footer "hline_bottom"
+* Set the font to "Times New Roman" and fontsize to 12
+* Output the table to word
+
+```{r}
+
+```
