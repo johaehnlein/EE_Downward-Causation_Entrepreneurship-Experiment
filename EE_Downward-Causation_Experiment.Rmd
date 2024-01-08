@@ -69,7 +69,7 @@ data <- read.xlsx("Data_EE Downward Causation_Conjoint_Wave2.xlsx")
 * role = Function of the entrepreneur in his startup
 * compcity = city of company headquarters
 * amountemp = Amount of employees in the entrepreneurs startup
-* pubfund = public funding by a funding program in germany
+* pubfund1 = public funding by a funding program in germany
 * programpart = Participation in an accleration or incubation program
 * startupcenter = Being in located in a startup or technology center
 * eecontlik = Conjoint Card 1-8 (Assessment of likelihood to engage in the EE contribution behavior)
@@ -80,11 +80,11 @@ data <- read.xlsx("Data_EE Downward Causation_Conjoint_Wave2.xlsx")
 * altruism_potential = Altruistic potential
 * positive_outcome_expectation = Expected positive outcome of the activity
 * benefit_perception = Perceived benefits of the entrepreneur
-* scenexp = Experience of the described scenario
-* scenpract = Practicability of the described scenario
-* studreal = Realism of the described study
-* critund = Understandability of decision criteria
-* fun = Fun factor of the study
+* evaluation_scenexp = Experience of the described scenario
+* evaluation_scenpract = Practicability of the described scenario
+* evaluation_studreal = Realism of the described study
+* evaluation_critund = Understandability of decision criteria
+* evaluation_fun = Fun factor of the study
 * ipfinvx = Intense Positive Feeling towards inventing (4 items)
 * ipffndx = Intense Positive Feeling towards founding (3 items)
 * ipfdev = Intense Positive Feeling towards developing (3 items)
@@ -118,6 +118,11 @@ data <- data |>
   rename("icdev" = "ic_icdev") |>
   rename("icinv" = "ic_icinv") |>
   rename("pubfund" = "pubfund1") |>
+  rename("scenexp" = "evaluation_scenexp") |>
+  rename("scenpract" = "evaluation_scenpract") |>
+  rename("studreal" = "evaluation_studreal") |>
+  rename("critund" = "evaluation_critund") |>
+  rename("fun" = "evaluation_fun") |>
   rowid_to_column(var = "respondent_id") # Create id column
 ```
 
@@ -130,7 +135,8 @@ In order to ensure data quality, respondents with low survey engagement shall be
 ```{r}
 data <- filter(data, bogus1 == 6) # Remove all respondent failing bogus item 1
 data <- filter(data, sudoku == 4) # Remove all respondent failing bogus item 2
-data <- filter(data, bogus3 == 4) # Remove all respondent failing bogus item 3
+data <- filter(data, evaluation_bogus3 == 4) # Remove all respondent failing bogus item 2
+data <- filter(data, bogus3 == 4) # Remove all respondent failing bogus item 4
 ```
 
 ### Remove too fast or too slow conducting respondents
@@ -146,7 +152,7 @@ time_out_lower <- data |>
   nrow()
 ```
 
-```{r}
+```{r}0
 time_out_higher <- data |>
   filter(duration < duration_higher) |>
   nrow()
@@ -206,7 +212,7 @@ numerical_summary_table <- flextable(numerical_summary_long) |>
     compage = "Company Age",
     amountemp = "Number of Employees") |>
   set_formatter(
-    Age = ~format(round(., 2), nsmall = 2),
+    "Age" = ~format(round(., 2), nsmall = 2),
     "Business Experience" = ~format(round(., 2), nsmall = 2),
     "Companies Founded" = ~format(round(., 2), nsmall = 2),
     "Company Age" = ~format(round(., 2), nsmall = 2),
@@ -286,6 +292,94 @@ for (var in names(categorical_summary_list)) {
 
 ```
 
+## Evaluation of survey feedback
+
+```{r}
+
+# Selection of survey feedback items
+
+survey_feedback <- select(data, "scenexp", "scenpract", "studreal", "critund", "fun")
+
+# Calculate means, medians & sds
+
+survey_feedback_vars <- survey_feedback |>
+  select(scenexp, scenpract, studreal, critund, fun) |>
+  summarise_all(list(mean = ~round(mean(., na.rm = TRUE), 2), 
+                     median = ~round(median(., na.rm = TRUE), 2), 
+                     sd = ~round(sd(., na.rm = TRUE), 2)))
+
+# Reshape the data
+survey_feedback_long <- survey_feedback_vars %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value") |>
+  separate(variable, into = c("variable", "statistic"), sep = "_") |>
+  pivot_wider(names_from = variable, values_from = value) |>
+  relocate(statistic, .before = 1)  
+
+# Creation and Export of flextable
+
+survey_feedback_table <- flextable(survey_feedback_long) |>
+    set_header_labels(
+    statistic = "Statistic",
+    scenexp = "Scenario experience",
+    scenpract = "Scenario practicability",
+    studreal = "Study realism",
+    critund = "Criteria understandability",
+    fun = "Perceived fun") |>
+  set_formatter(
+    "Scenario experience" = ~format(round(., 2), nsmall = 2),
+    "Scenario practicability" = ~format(round(., 2), nsmall = 2),
+    "Study realism" = ~format(round(., 2), nsmall = 2),
+    "Criteria understandability" = ~format(round(., 2), nsmall = 2),
+    "Perceived fun" = ~format(round(., 2), nsmall = 2)) |>
+  set_table_properties(layout = "autofit") |>
+  color(part = "header", color = "white") |>
+  bg(part = "header", bg = "gray") |>
+  align(align = "center", part = "all")
+
+print(survey_feedback_table)
+
+```
+
+## Removal of data not being used further in the analysis 
+
+```{r}
+data <- data |>
+  select(-c(scenexp)) |>
+  select(-c(scenpract)) |>
+  select(-c(studreal)) |>
+  select(-c(critund)) |>
+  select(-c(fun)) |>
+  select(-c(education)) |>
+  select(-c(role)) |>
+  select(-c(compact)) |>
+  select(-c(busexp)) |>
+  select(-c(amountfound)) |>
+  select(-c(compfound)) |>
+  select(-c(compage)) |>
+  select(-c(compcity)) |>
+  select(-c(bogus1)) |>
+  select(-c(sudoku)) |>
+  select(-c(evaluation_bogus3)) |>
+  select(-c(bogus3)) |>
+  select(-c(amountemp)) |>
+  select(-c(duration)) 
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Analysis of measured variables
 
@@ -307,12 +401,16 @@ Subsequently we conduct a confirmatory factor analysis (CFA) to evaluate the fac
 
 ```{r}
 
+# Score reversion of exchange orientation items as indicated by the original scales (Clark & Mills, 2012)
+
 data <- data |>
-  mutate(  exor3 = 6 - exor3,
+  mutate(  exor3 = 8 - exor3,
     exor4 = 8 - exor4,
     exor5 = 8 - exor5,
     exor9 = 8 - exor9
-  )
+  ) 
+
+# CFA model
 
 cfa_model <- "gen_trust =~ gentrust1 + gentrust2 + gentrust1 + gentrust4 + gentrust5 + gentrust6
               self_int =~ selfint1 + selfint2 + selfint3
@@ -419,6 +517,18 @@ data <- data |>
 
 ```
 
+
+
+
+
+
+
+
+
+
+
+
+
 # Conjoint experiment
 
 ## Fractional Factorial Design 
@@ -461,12 +571,13 @@ profiles <- tibble(
     **programpart
     **startupcenter
     **eecontlike1 to eecontlike8
+    **[CFA Factors]
 
 
 ```{r}
 
 first_round_data <- data |>
-  select(1:3, 13:15, 17:24) # Selecting data from first collection round
+  select(1:14) # Selecting data from first collection round
 
 first_round_data <- first_round_data |>
   pivot_longer(!c(1:6), # pivoting the data set to a long format
@@ -488,13 +599,13 @@ first_round_data <- first_round_data |>
     **programpart
     **startupcenter
     **eecontlike1rep to eecontlike8rep
-    ** [CFA Factors]
+    **[CFA Factors]
 
 
 ```{r}
 
 second_round_data <- data |>
-  select(1:3, 13:15, 26:33) # Selecting data from second collection round
+  select(1:6, 15:22) # Selecting data from second collection round
 
 second_round_data <- second_round_data |>
   pivot_longer(!c(1:6), # pivoting the data set to a long format
