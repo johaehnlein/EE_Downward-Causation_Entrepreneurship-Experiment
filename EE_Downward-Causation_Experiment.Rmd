@@ -29,21 +29,25 @@ First, we approached the potential participants for our main study through vario
 
 # Libraries
 
-
 ```{r}
 library(openxlsx) # Used to import and export excel files
 library(tidyverse) # Used to load all tidyverse packages
 library(lavaan) # Used to perform confirmatory factor analyses
 library(psych) # Used to calculate Cronbach's Alpha and ICC values
 library(apaTables) # Used to create correlation tables
+library(lme4) # Used for multilevel modeling 
 library(lmerTest) # Used for multilevel regression adding p-values to the lme4 package
-library(broom.mixed) # Used to tidy result objects
+library(lmtest) # For calculating robust standard errors
+library(broom) # Used to create tidy data frames with model results
+library(broom.mixed) # Used to tidy result objects for multilevel modeling
 library(parameters) # Used to augement regression analyses
 library(performance) # Used to  obtain R2 for multilevel models
-library(flextable) # Used for table creation
 library(knitr) # Used for table creation
 library(clubSandwich) # Used for cluster robust standard errors
 library(sandwich) # Used for cluster robust standard errors
+library(flextable) # Used for table creation
+library(plotly) # To create violin plots
+library(viridis) # Provides additional color schemes
 ```
 
 # Data
@@ -626,7 +630,7 @@ data <- rbind(first_round_data, second_round_data)
 ### Merging factorial design
 
 ```{r}
-data <- left_join(data, profiles, by = "profile") |> #adding profiles to data set
+data <- left_join(data, profiles, by = "profile") |> 
   relocate("ee_support_reception", "ee_affiliation", "ee_relationships", "altruism_potential", "positive_outcome_expectation", "benefit_perception", .after = "profile") #relocating attributes in the data set
 
 ```
@@ -640,6 +644,661 @@ data <- data |>
    mutate(round_id = as_factor(round_id))
 
 ```
+
+
+## Evaluation of data consistency
+
+Due to the nature of conjoint studies with complex and theoretically derived scenarios, the potential uncertainity, ambiguity and eventually careless responses is high (Lohrke, 2010). In order to test response consistency, we replicated all 8 profiles of our fractional factorial design (Shepherd & Zacharakis, 2018). Using the data sets from both data collection rounds, we can test the stability of responses applying test-retest reliability assesment.
+
+To evaluate test-retest reliability, we follow the subsequent workflow proposed by Schueler et al. (2023):
+
+1. Calculation of the Intraclass Correlation Coefficient (ICC) for each decision profile
+2. Estimation of a linear model with clustered standard errors
+3. Calculation of a slope difference test for each parameter
+4. Specification of a fully pooled model using both rounds of data with two-way clustered standard errors for both, round and respondent
+
+Before implementing this workflow for the
+
+### Help Functions
+
+#### Help Functions Pearson's R
+
+This function takes a data set as an input, splits it into the initial and replication responses, calculates the correlation for each profile, and returns a correlation vector.
+
+
+```{r}
+rel_cor <- function(data) {
+
+# Selecting conjoint profile data from first collection round  
+    first_round_data_rel <- data |>
+    filter(round_id == 1) |>
+    select(respondent_id, profile, eecontlike) |>
+    group_by(profile) |>
+    group_split()   
+
+# Selecting conjoint profile data from second collection round (replication)   
+  second_round_data_rel <- data |>
+    filter(round_id == 2) |>
+    select(respondent_id, profile, eecontlike) |>
+    group_by(profile) |>
+    group_split()   
+
+# Calculating correlation for each profile
+  cor <- map2(first_round_data_cor, second_round_data_cor, ~ cor(.x$eecontlike, .y$eecontlike))   
+
+# Collapsing list to vector
+  cor <- unlist(cor)   
+
+# Returning correlation vector
+  return(cor)   
+}
+```
+
+#### Help Functions ICC(3,k)
+
+This function takes a data set as an input, splits it into the initial and replication responses, calculates the ICC(3,k) for each profile by calling an additional helper function, and returns a data frame with ICC(3,k) and its 95% confidence interval.
+
+```{r}
+rel_icc <- function(data) {
+
+# Selecting conjoint profile data from first collection round
+  first_round_data_rel <- data |>
+    filter(round_id == 1) |>
+    select(respondent_id, profile, eecontlike) |>
+    group_by(profile) |>
+    group_split() 
+
+# Selecting conjoint profile data from second collection round (replication) 
+  second_round_data_rel <- data |>
+    filter(round_id == 2) |>
+    select(respondent_id, profile, eecontlike) |>
+    group_by(profile) |>
+    group_split() 
+
+# Map over all profiles and compute the ICC(3,k)
+  res <- map2_dfr(first_round_data_rel, second_round_data_rel, ~ icc_3k(.x, .y)) # Calculating the ICC(3,k) for all profiles
+
+# Returning correlation vector    
+  return(res) 
+}
+
+# function to compute the ICC(3,k)
+  icc_3k <- function(first_round_data_rel, second_round_data_rel) {
+  
+# Getting all profiles 
+  profile <- unique(first_round_data_rel$profile) 
+
+# Creating a temporary data set
+  tmp_data <- tibble(first_round_data_rel = first_round_data_rel$eecontlike, second_round_data_rel = second_round_data_rel$eecontlike) 
+
+# Computing ICCs and extracting ICC(3,k) and its 95% confidence interval
+  icc <- ICC(tmp_data, missing = TRUE, 
+             alpha = .05, 
+             lmer = FALSE, 
+             check.keys = FALSE)$results |>
+    filter(type == "ICC3k") |>
+    select(ICC, "lower bound", "upper bound") |>
+    rename(icc_lower = "lower bound", icc_upper = "upper bound") |>
+    mutate_all(round, 2) |>
+    mutate(ICC = if_else(ICC < 0, 0, ICC)) |>
+    mutate(icc_lower = if_else(icc_lower < 0, 0, icc_lower)) |> 
+    remove_rownames(.)   
+
+# Create table
+  res <- cbind(profile, icc)
+
+# Return result
+  return(res)
+}
+
+```
+
+#### Help functions Slope Difference Tests
+
+This function takes a data set as an input, splits it into initial and replication responses, fits two linear models with robust standard errors and then calls an additional function to perform a slope difference test an each coefficient. This additional function takes a variable name, two beta coefficients and standard errors as inputs to conduct perform a slope difference test.
+
+```{r}
+slope_difference <- function(data) {
+  
+# Selecting conjoint profile data from first collection round
+  first_round_data_sdt <- data |> 
+    filter(round_id == 1) 
+
+# Selecting conjoint profile data from second collection round (replication)
+  second_round_data_sdt <- data |> 
+    filter(round_id == 2) 
+  
+# Creating regression formula
+  reg_form <- first_round_data_sdt |>
+    select(-c(respondent_id, round_id, profile, eecontlike)) |>
+    colnames() |>
+    paste0(collapse = " + ")
+  reg_form <- formula(paste0("eecontlike ~ ", reg_form))
+
+# Fitting a linear regression model on both rounds of responses
+  m1.model <- lm(reg_form, data = first_round_data_sdt)
+  m2.model <- lm(reg_form, data = second_round_data_sdt)
+
+# Calculating and capturing clustered standard errors
+  m1.tidy <- model_parameters(
+    m1.model,
+    vcov = "vcovCL",
+    vcov_args = list(type = "HC1", cluster = first_round_data_sdt$respondent_id)
+  )
+
+  m2.tidy <- model_parameters(
+    m2.model,
+    vcov = "vcovCL",
+    vcov_args = list(type = "HC1", cluster = second_round_data_sdt$respondent_id)
+  )
+
+# Dropping intercept to tidy the dataframe
+  m1.tidy <- filter(m1.tidy, Parameter != "(Intercept)")
+  m2.tidy <- filter(m2.tidy, Parameter != "(Intercept)")
+
+# Transforming data frame rows into a list of single row data frames
+  m1.tidy <- m1.tidy |>
+    group_by(Parameter) |>
+    group_split()
+
+  m2.tidy <- m2.tidy |>
+    group_by(Parameter) |>
+    group_split()
+
+# Applying the slope difference test function to the lists of single row data frames
+  res <- map2_dfr(m1.tidy, m2.tidy, 
+                  ~ get_difference(name = .x$Parameter,
+                                   b1 = .x$Coefficient,
+                                   se1 = .x$SE,
+                                   b2 = .y$Coefficient,
+                                   se2 = .y$SE))
+
+# Return result
+  return(res)
+}
+
+get_difference <- function(name, b1, se1, b2, se2) {
+  
+# Computing the difference between both beta coefficients
+  b <- b1 - b2
+
+# Computing the corresponding standard error
+  se <- sqrt((se1^2) + (se2^2))
+
+# Multiplying the standard error by two to obtain at least the 95% CI
+  test <- se * 2
+
+# Checking if the absolute beta difference is at least two SEs away from zero
+  if (abs(b) >= test) {
+    
+# If true, then both slopes are significantly different from another
+    res <- "Yes"
+    
+  } else {
+    
+# If false, both slopes are not significantly different from another
+    res <- "No"
+    
+  }
+
+# Creating table
+  res <- tibble(Coefficient = name, 
+                Beta_diff = b, 
+                Joint_se = se, 
+                Test_statistic = abs(b) - (2 * se), 
+                Stat_diff = res)
+
+# Rounding all values to two digits
+  res <- mutate(res, across(where(is.double), round, 2))
+
+# Returning result
+  return(res)
+}
+```
+
+#### Help functions Pooled Regression
+
+This function takes a data set as an input and fits a pooled regression model.
+
+```{r}
+pooled_regression <- function(data) {
+  
+# Converting the grouping variables to a factor
+  multi.df <- data |>
+    mutate(round_id = as_factor(round_id),
+           respondent_id = as_factor(respondent_id))
+
+# Creating regression formula
+  reg_form <- multi.df |>
+    select(-c(respondent_id, round_id, profile, eecontlike)) |>
+    colnames() |>
+    paste0(collapse = " + ")
+  reg_form <- formula(paste0("dv ~ ", reg_form))
+
+# Fitting a linear regression model
+  m3_model <- lm(reg_form, data = multi.df)
+
+# Obtaining and showing two-way clustered standard errors (by respondent and round)
+  res <- coeftest(m3_model, vcov = vcovCL, cluster = ~ respondent_id + round_id)
+
+# Tidying result
+  param <- tidy(res)
+
+# Changing labels
+  param <- param |>
+    mutate(estimate = round(estimate, 2)) |>
+    mutate(std.error = round(std.error, 2)) |>
+    mutate(statistic = round(statistic, 2)) |>
+    mutate(p.value = round(p.value, 4)) |>
+    rename(Coefficient = term) |>
+    rename(B = estimate) |>
+    rename(`t-ratio` = statistic) |>
+    rename(`p-value` = p.value) |>
+    rename(SE = std.error)
+
+# Extracting model fit
+  fit_pr <- glance(m3_model)
+
+# Changing labels
+  fit_pr <- tibble(
+    Coefficient = c(colnames(fit)[[1]], 
+                    colnames(fit)[[2]], 
+                    colnames(fit)[[3]], 
+                    "Decisions", 
+                    "Respondents"),
+    B = c(round(fit$r.squared, 2), 
+          round(fit$adj.r.squared, 2), 
+          round(fit$sigma, 2), 
+          fit$nobs, 
+          length(unique(multi.df$respondent_id))),
+    SE = c(NA_real_, NA_real_, NA_real_, NA_real_, NA_real_),
+    `t-ratio` = c(NA_real_, NA_real_, NA_real_, NA_real_, NA_real_),
+    `p-value` = c(NA_real_, NA_real_, NA_real_, NA_real_, NA_real_))
+
+# Adding fit to results
+  res <- rbind(param, fit_pr)
+
+# Returning result
+  return(res)
+}
+```
+
+#### Violin Plots
+
+##### Response Deviations
+
+This function takes a data set as an input, splits it into initial and replication responses and computes, for each profile, the difference between responses for each respondent.
+
+```{r}
+compute_deviation <- function(data) {
+  
+# Selecting conjoint profile data from first collection round
+  first_round_data_rd <- data |> 
+    filter(round_id == 1) |> 
+    select(respondent_id, profile, eecontlike) |>
+    group_by(profile) |> 
+    group_split()
+  
+# Selecting conjoint profile data from second collection round (replication)
+  second_round_data_rd <- data |> 
+    filter(round_id == 2) |> 
+    select(respondent_id, profile, eecontlike) |> 
+    group_by(profile) |> 
+    group_split()
+  
+# Extracting respondent id
+  respondent_id <- map(first_round_data_rd, ~ select(.x, respondent_id))
+  respondent_id <- map(id, ~ unlist(.x$respondent_id))
+  respondent_id <- tibble(respondent_id = respondent_id[[1]])
+  
+# Selecting the eecontlike column (First round of data collection)
+  first_round_data_tmp <- map(first_round_data_rd, ~ select(.x, eecontlike))
+  
+# Turning data frame into a numeric vector (First round of data collection)
+  first_round_data_tmp <- map(first_round_data, ~ unlist(.x$eecontlike))
+  
+# Select the eecontlike column (Second round of data collection)
+  second_round_data_tmp <- map(second_round_data_tmp, ~ select(.x, eecontlike))
+  
+# Turning data frame into numeric vector (Second round of data collection)
+  second_round_data_tmp <- map(second_round_data_tmp, ~ unlist(.x$eecontlike))
+  
+# Subtracting initial response from replication response
+  dev_dat <- map2(second_round_data_tmp, first_round_data_tmp, ~ .x - .y)
+  
+# Converting list to data frame
+  dev_dat <- as_tibble(do.call("cbind", dev_dat))
+  dev_dat <- cbind(respondent_id, dev_dat)
+  
+# Returning result
+  return(dev_dat)
+}
+```
+
+##### Data Wide to Long
+
+This function takes a data set as an input and pivots it from wide to long, so that there is an ID column, a profile column, and a deviation column. This format is required to create a violin plot.
+
+```{r}
+wide_to_long <- function(data) {
+  
+# Pivoting the data frame from wide to long
+  data <- data |>
+    pivot_longer(!respondent_id, names_to = "profile", values_to = "deviation") |>
+    mutate(profile = paste0("Profile ", str_extract(profile, "\\d+")))
+
+# Returning result
+  return(data)
+}
+```
+
+##### Create Violin Plot
+
+This function requires a data set, the number of profiles, the width and the height of the plot, and its name, as inputs and creates a violin plot.
+
+
+```{r}
+violin_plot <- function(data, num_profiles = 8, plot_height = 15, plot_width = 20, plot_name = violin_plot_eecontlike) {
+  
+# Profile names as factor with ordered levels to preserve order
+  data$profile <- factor(data$profile, levels = unique(data$profile))
+
+# Custom text styling for axis labels
+  t1 <- list(
+    family = "Times New Roman",
+    color = "black",
+    face = "bold",
+    size = 12
+  )
+
+# Custom text styling for axis labels
+  t2 <- list(
+    family = "Times New Roman",
+    color = "black",
+    size = 16
+  )
+
+# Creating violin plot with plotly
+  p <- plot_ly(data,
+               width = plot_width, 
+               height = plot_height,
+               y = ~deviation, 
+               color = ~profile,
+               type = "violin", 
+               colors = viridis_pal(option = "C")(num_profiles),
+               box = list(visible = T, line = list(color = "dimgrey")), 
+               meanline = list(visible = T, color = "black")) |>
+    layout(font = t1) %>%
+    layout(paper_bgcolor = "white") |>
+    layout(plot_bgcolor = "transparent") |>
+    layout(yaxis = list(
+      title = list(text = "<b>Deviation Magnitude Distribution</b>", font = t2),
+      gridcolor = "lightgrey", 
+      zerolinecolor = "grey")) |>
+    layout(xaxis = list(
+      categoryarray = ~profile, 
+      categoryorder = "array")) |>
+    layout(xaxis = list(
+      title = list(text = "<b>Profile Level</b>", font = t2),
+      gridcolor = "#ffff", zerolinecolor = "#ffff")) |>
+    layout(showlegend = FALSE) |>
+    config(displaylogo = FALSE, modeBarButtonsToRemove = c(
+      "toggleSpikelines",
+      "hoverClosestCartesian",
+      "hoverCompareCartesian")) |>
+    config(toImageButtonOptions = list(
+      format = "png",
+      filename = plot_name,
+      scale = 1))
+
+  # Return result
+  return(p)
+}
+```
+
+### ICC Effect Plot
+
+This function takes a data set as an input and creates an ICC effect plot.
+
+```{r}
+icc_effect_plot <- function(data) {
+  
+  # Create the plot
+  plot <- ggplot(data = data, 
+                 aes(x = profile, 
+                     y = ICC, 
+                     ymin = icc_lower, 
+                     ymax = icc_upper)) +
+    geom_pointrange() +
+    geom_text(aes(label = ICC), nudge_x = 0.28) +
+    labs(
+      title = paste0("ICC Values -- Profiles 1-", length(data$profile)),
+      subtitle = "95% Confidence Interval As Vertical Line",
+      x = NULL,
+      y = "Intraclass Correlation Coefficients") +
+    theme_minimal()
+
+  # Return result
+  return(plot)
+}
+```
+
+
+### Slope Difference Effect Plot
+
+This function takes a data set as an input and creates slope difference effect plot.
+
+```{r}
+slope_effect_plot <- function(data) {
+  
+  # Create the plot
+  plot <- ggplot(data = data, aes(x = Coefficient, y = Test_statistic)) +
+    geom_point() +
+    geom_text(aes(label = Test_statistic), nudge_x = 0.25) +
+    coord_flip() +
+    geom_hline(yintercept = 0, size = 2) +
+    annotate("text",
+      x = 2.5, y = 0.01, angle = 90,
+      label = "Statistically Significant at Zero or Higher") +
+    labs(
+      title = "Slope Difference Test Results",
+      subtitle = "No Statistically Significant Difference for Test Statistic Below Zero",
+      y = "Test Statistic",
+      x = "Independent Variables") +
+    theme_minimal()
+
+  # Return plot
+  return(plot)
+}
+```
+
+### Replication Reliability Comparisons
+
+This function takes two data sets as inputs and requires information how many profiles reflect a replication of 25% of the profiles etc. With this input, the function computes the mean ICC and Pearson's for each replication variant.
+
+```{r}
+rel_rep <- function(dat_icc = data, dat_cor = data, rep_25 = 2, rep_50 = 4, rep_75 = 6, rep_100 = 8) {
+  
+# Computing the mean ICC for a replication of 25% of the profiles
+  icc_25 <- dat_icc |>
+    filter(profile == c(1:rep_25)) |>
+    summarise(icc = round(mean(ICC), 2), 
+              icc_lower = round(mean(icc_lower), 2), 
+              icc_upper = round(mean(icc_upper), 2))
+  
+# Computing the mean ICC for a replication of 50% of the profiles
+  icc_50 <- dat_icc %>%
+    filter(profile == c(1:rep_50)) |>
+    summarise(icc = round(mean(ICC), 2), 
+              icc_lower = round(mean(icc_lower), 2), 
+              icc_upper = round(mean(icc_upper), 2))
+
+# Computing the mean ICC for a replication of 75% of the profiles
+  icc_75 <- dat_icc |>
+    filter(profile == c(1:rep_75)) |>
+    summarise(icc = round(mean(ICC), 2), 
+              icc_lower = round(mean(icc_lower), 2), 
+              icc_upper = round(mean(icc_upper), 2))
+
+# Computing the mean ICC for a replication of 100% of the profiles
+  icc_100 <- dat_icc |>
+    filter(profile == c(1:rep_100)) |>
+    summarise(icc = round(mean(ICC), 2), 
+              icc_lower = round(mean(icc_lower), 2), 
+              icc_upper = round(mean(icc_upper), 2))
+
+# Computing the mean correlation for a replication of 25% of the profiles
+  cor_25 <- dat_cor |>
+    filter(profile == c(1:rep_25)) |>
+    summarise(cor = round(mean(r), 2))
+
+# Computing the mean correlation for a replication of 50% of the profiles
+  cor_50 <- dat_cor %>%
+    filter(profile == c(1:rep_50)) |>
+    summarise(cor = round(mean(r), 2))
+  
+# Computing the mean correlation for a replication of 75% of the profiles
+  cor_75 <- dat_cor |>
+    filter(profile == c(1:rep_75)) |>
+    summarise(cor = round(mean(r), 2))
+
+# Computing the mean correlation for a replication of 100% of the profiles
+  cor_100 <- dat_cor |>
+    filter(profile == c(1:rep_100)) |>
+    summarise(cor = round(mean(r), 2))
+
+# Combining ICCs and correlations
+  reliability_25 <- cbind(cor_25, icc_25)
+  reliability_50 <- cbind(cor_50, icc_50)
+  reliability_75 <- cbind(cor_75, icc_75)
+  reliability_100 <- cbind(cor_100, icc_100)
+  replications <- tibble(replications = c("25%", "50%", "75%", "100%"))
+
+# Combining everything into a single table
+  reliability <- rbind(reliability_25, 
+                       reliability_50, 
+                       reliability_75, 
+                       reliability_100)
+
+# Merging replication information with result table
+  replications <- cbind(replications, reliability)
+
+# Returning result
+  return(replications)
+}
+```
+
+
+## Step 1: Reliabilities
+
+### Pearson's r
+
+```{r}
+# Get profile-level correlations
+data_cor <- map(data, ~ rel_cor(data = .x))
+
+# Create table
+data_cor[[1]] <- tibble(profile = c(1,2,3,4,5,6,7,8), r = round(data_cor[[1]], 2))
+
+```
+
+
+### ICC(3,k)
+
+```{r}
+# Get profile-level ICCs
+data_icc <- map(data, ~ rel_icc(data =  = .x))
+```
+
+
+### Combine Reliabilities
+
+```{r}
+# Combine both reliabilities for all three data sets
+data_rel <- map2(data_cor, data_icc, ~ left_join(.x, .y, by = "profile"))
+
+
+# Create mean row to be placed at the bottom
+means <- tibble(profile = "Mean", 
+                "r.x" = mean(data_rel$r.x, na.rm = TRUE),
+                "ICC.x" = mean(data_rel$ICC.x, na.rm = TRUE),
+                "icc_lower.x" = mean(data_rel$icc_lower.x, na.rm = TRUE),
+                "icc_upper.x" = mean(data_rel$icc_upper.x, na.rm = TRUE),
+                "r.y" = mean(data_rel$r.y, na.rm = TRUE),
+                "ICC.y" = mean(data_rel$ICC.y, na.rm = TRUE),
+                "icc_lower.y" = mean(data_rel$icc_lower.y, na.rm = TRUE),
+                "icc_upper.y" = mean(data_rel$icc_upper.y, na.rm = TRUE),
+                "r" = mean(data_rel$r, na.rm = TRUE),
+                "ICC" = mean(data_rel$ICC, na.rm = TRUE),
+                "icc_lower" = mean(data_rel$icc_lower, na.rm = TRUE),
+                "icc_upper" = mean(data_rel$icc_upper, na.rm = TRUE))
+
+# Round means to two decimals
+means <- mutate(means, across(where(is.double), round, 2))
+
+# Add mean row at the bottom of the data frame
+data_rel <- rbind(data_rel, means)
+```
+
+
+### Create Table
+
+```{r}
+# Use flextable to create a nice table for publication
+data_rel |>
+  flextable() |>
+  align(align = "center", j = c(1:13), part = "header") |>
+  align(align = "center", j = c(1:13), part = "body") |>
+  add_header_row(
+    colwidths = c(1, 4, 4, 4),
+    values = c(
+      "",
+      "3 Attributes 2 Levels",
+      "3 Attributes 3 Levels",
+      "5 Attributes 2 Levels")) |>
+  set_header_labels(
+    profile = "Profile",
+    r.x = "r",
+    ICC.x = "ICC3k",
+    icc_lower.x = "ICC3k lower",
+    icc_upper.x = "ICC3k upper",
+    r.y = "r",
+    ICC.y = "ICC3k",
+    icc_lower.y = "ICC3k lower",
+    icc_upper.y = "ICC3k upper",
+    r = "r",
+    ICC = "ICC3k",
+    icc_lower = "ICC3k lower",
+    icc_upper = "ICC3k upper") |>
+  vline(j = c(1, 5, 9), part = "all") |>
+  hline(i = 9) %>%
+  font(fontname = "Times New Roman", part = "all") |>
+  fontsize(part = "all", size = 12) |>
+  set_table_properties(layout = "autofit")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Correlation Table
 
