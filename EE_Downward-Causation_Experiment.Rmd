@@ -644,7 +644,41 @@ data <- data |>
 ```
 
 
-## Evaluation of data consistency
+
+## Correlation Table
+
+The correlation table of the model includes the dependent variable, controls as well as significant factors from the CFA. These are:
+
+  *eecontlike
+  *age
+  *gender
+  *pubfund
+  *programpart
+  *startupcenter
+  *[CFA Factors]
+
+
+```{r}
+
+data |>
+  select(eecontlike, age, gender, pubfund, programpart, startupcenter) |> #selecting variables
+  apa.cor.table() #creation of correlation matrix
+
+```
+
+
+## Evaluation of data consistency & regression model
+
+As already explained earlier, our conjoint experiment included the following theoretically derived 6 attributes:
+
+* Dependent variable: eecontlike = likelihood to engage in the EE contribution behavior
+* Independent variables:
+    **ee_support_reception = Perceived EE support
+    **ee_affiliation = Affiliation to the EE
+    **ee_relationships = Personal Relationship to EE actors
+    **altruism_potential = Altruistic potential
+    **positive_outcome_expectation = Expected positive outcome of the activity
+    **benefit_perception = Perceived benefits of the entrepreneur
 
 Due to the nature of conjoint studies with complex and theoretically derived scenarios, the potential uncertainity, ambiguity and eventually careless responses is high (Lohrke, 2010). In order to test response consistency, we replicated all 8 profiles of our fractional factorial design (Shepherd & Zacharakis, 2018). Using the data sets from both data collection rounds, we can test the stability of responses applying test-retest reliability assesment.
 
@@ -653,7 +687,11 @@ To evaluate test-retest reliability, we follow the subsequent workflow proposed 
 1. Calculation of the Intraclass Correlation Coefficient (ICC) for each decision profile
 2. Estimation of a linear model with clustered standard errors
 3. Calculation of a slope difference test for each parameter
-4. Specification of a fully pooled model using both rounds of data with two-way clustered standard errors for both, round and respondent
+4. Specification of a fully pooled model using both rounds of data with two-way clustered standard errors for both, round and respondent as well as multilevel model to check the results.
+
+
+We will include the earlier specified and listed variables in the regression model.
+
 
 ### Step 1: Calculation of ICC Values for Each Profile
 
@@ -901,180 +939,241 @@ bind_rows(profile1_icc,
 
 
 
+### Step 2: Linear Model with clustered standard errors
 
+In this step we calculate a simple linear model for each round of data, capture those results, and display them in a table. The purpose of this step is to capture the parameter estimates---beta coefficients---to use for the slope difference test. 
 
+#### First Round
 
-
-
-
-
-
-
-
-
-## Correlation Table
-
-The correlation table of the model includes the dependent variable, controls as well as significant factors from the CFA. These are:
-
-  *eecontlike
-  *age
-  *gender
-  *pubfund
-  *programpart
-  *startupcenter
-  *[CFA Factors]
-
+##### First Round Data
 
 ```{r}
-
-data |>
-  select(eecontlike, age, gender, pubfund, programpart, startupcenter) |> #selecting variables
-  apa.cor.table() #creation of correlation matrix
+# Filtering the data set first round data and convert the ID into a factor
+first_round_data <- data |> 
+  filter(round_id == 1) |> 
+  mutate(respondent_id = as_factor(respondent_id))
 
 ```
 
-## Regression Model
+##### First Round Model
 
-The following regression modell represents a multilevel modell, as conjoint profiles were answered twice in two seperat rounds. 
+```{r}
+# Fitting the model
+first_round_model <- lm(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + positive_outcome_expectation + benefit_perception, data = first_round_data)
 
-We will include the earlier specified and listed variables.
+# Calculating clustered standard errors
+first_round_cluster <- coeftest(first_round_model, vcov = vcovCL, cluster = ~ respondent_id)
+
+# Displaying results
+tidy(first_round_cluster) |> 
+  select(term, estimate, std.error)
+```
+
+##### Capturing Model Parameters (First Round)
+
+```{r}
+# Extracting relevant information from the model's results and format it as a table
+first_round_est <- tidy(first_round_cluster) |> 
+  select(term, estimate, std.error) |>  
+  rename(IV = "term", Beta_first = "estimate", SE_first = "std.error")
+```
 
 
-### Model fitting
+#### Second Round (Replication)
 
-The linear regression model includes the following variables:
+##### Second Round Data
 
-* Dependent variable: eecontlike = likelihood to engage in the EE contribution behavior
-* Independent variables:
-    **ee_support_reception = Perceived EE support
-    **ee_affiliation = Affiliation to the EE
-    **ee_relationships = Personal Relationship to EE actors
-    **altruism_potential = Altruistic potential
-    **positive_outcome_expectation = Expected positive outcome of the activity
-    **benefit_perception = Perceived benefits of the entrepreneur
-* Control variables:
-    **age
-    **gender
-    **pubfund
-    **programpart
-    **startupcenter
-    **CFA Factors
-* Nesting variable: respondent_id
+```{r}
+second_round_data <- data %>% 
+  filter(round_id == 2) %>% 
+  mutate(respondent_id = as_factor(respondent_id))
+```
+
+##### Second Round Model
 
 ```{r}
 
-res <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + positive_outcome_expectation + benefit_perception + (1|respondent_id), REML = TRUE, data = data)
+# Fitting the model
+second_round_model <- lm(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + positive_outcome_expectation + benefit_perception, data = second_round_data)
+
+# Calculating clustered standard errors
+second_round_cluster <- coeftest(second_round_model, vcov = vcovCL, cluster = ~ respondent_id)
+
+# Displaying results
+tidy(second_round_cluster) |> 
+  select(term, estimate, std.error)
+
+```
+
+##### Capturing Model Parameters (Second Round)
+
+```{r}
+# Extracting relevant information from the model's results and format it as a table
+second_round_est <- tidy(second_round_cluster) |> 
+  select(estimate, std.error) |>  
+  rename(Beta_second = "estimate", SE_second= "std.error")
 
 ```
 
 
-### Extracting Model Fit
+#### Display Both Model Results
+
+```{r}
+# Combine the results of both models into a single data frame and display 
+#  as a table
+both_rounds_models_est <- bind_cols(first_round_est, second_round_est)
+
+both_rounds_models_est
+
+```
+
+#### Step 3: Slope Difference Test
+
+Evaluate consistency across estimated models using the first round of data collection and the second round.
+We use the process outlined by Gelman and Stern (2006) to test for a statistically significant difference between the estimate of each independent variable beta in the first round model and that in second round model. This is a simple test to evaluate whether two studies using the same instrument and similar assumptions about the population of interest (e.g., similar random draws) produce statistically similar results. The null hypothesis for the test is that $(\beta_{m1} - \beta_{m2}) = 0$ where $m1$ is the estimate of beta from the first model and $m2$ from the second. 
+
+Here we use the test to evaluate consistency across estimated models using the initial round of data collection and the replication round. Random variation suggests that there will be differences between the two rounds; the question for researchers is whether this variation is statistically meaningful. Even in the case of relatively low test-retest reliability, researchers may still have confidence reporting results should the models produce similar results---giving credibility to the conclusion that random variation is responsible for small differences as opposed to a more systematic concern. 
+
 
 
 ```{r}
+both_rounds_models_std <- both_rounds_models_est |> 
+  mutate(Beta_diff = Beta_first - Beta_second,
+         Joint_se = round(sqrt((SE_first^2) + (SE_second^2)), 2),
+         Test_statistic = abs(Beta_diff) - (2 * Joint_se),
+         Stat_diff = case_when(Test_statistic >= 0 ~ "Yes", 
+                               Test_statistic < 0 ~ "No")) |>  
+  mutate(across(where(is.double), round, 2))
 
-model_fit <- glance(res) # Extracting model fit
+both_rounds_models_std
+```
 
-r2 <- r2_nakagawa(res, by_group = TRUE) # Computing R2
 
-icc <- icc(res, by_group = TRUE) # Computing ICC 
+### Step 4: Pooled Model
 
-# Creation of a fit table 
-model_fit <- tibble(
-  Variable = c(
-    "R2 Level 1",
-    "R2 Level 2",
-    "ICC",
-    "Sigma",
-    "Decisions",
-    "Respondents"),
-      "B (β)" = c(
-         round(r2$R2[1], 2),
-         round(r2$R2[2], 2),
-         round(icc$ICC[1],2),
-        round(model_fit$sigma, 3),
-        model_fit$nobs, length(unique(data$respondent_id))),
-    SE = c(NA_real_, NA_real_, NA_real_, NA_real_, NA_real_, NA_real_),
-    `t-ratio` = c(NA_real_, NA_real_, NA_real_, NA_real_, NA_real_, NA_real_),
-     `p-value` = c(NA_real_, NA_real_, NA_real_, NA_real_, NA_real_, NA_real_)
+In our last step, we advocate for estimating a pooled model that would include both rounds of data collection. The intent here is to improve consistency of the parameter estimates by taking advantage of the pooling and shrinkage inherent to these models, and to also improve consistency of inference by lowering the estimated standard errors (see Gelman, 2006). 
+
+Subsequently we use a pooled model to test the study's research question.
+
+#### Pooled Data
+
+```{r}
+
+# Converting round_id and respondent_id into a factor to correct the standard errors for clustering by round and by respondent
+pooled_data <- data |> 
+  mutate(round_id = as_factor(round_id),
+         respondent_id = as_factor(respondent_id))
+
+```
+
+#### Pooled Regression Model
+
+```{r}
+
+# Fitting the model
+pooled_model <- lm(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + positive_outcome_expectation + benefit_perception, data = pooled_data)
+
+# Calculating clustered standard errors at the respondent and round levels
+pooled_cluster <- coeftest(pooled_model, vcov = vcovCL, cluster = ~ respondent_id + round_id)
+
+# Displaying the results
+tidy(pooled_cluster) |>
+  select(term, estimate, std.error)
+
+```
+
+##### Reporting models
+
+```{r}
+
+# Extracting model fit statistics
+pooled_model_fit <- glance(pooled_model)
+
+# Displaying the results
+pooled_model_fit
+
+# Creating a fit table
+model_fit_table <- tibble(
+  `R-Squared` = round(pooled_model_fit$r.squared, 2),
+  `Adjusted R-Squared` = round(pooled_model_fit$adj.r.squared, 2),
+  `Sigma` = round(pooled_model_fit$sigma, 2),
+  `F-Statistic` = round(pooled_model_fit$statistic, 2),
+  `p-value` = round(pooled_model_fit$p.value, 2),
 )
-```
 
-### Standardize Coefficients
-
-Subsequently we compute the standardized regression coefficients:
-
-```{r}
-# Obtaining standardized parameters
-res_std <- standardize_parameters(res, method = "posthoc")
-
-# Selecting standardized coefficients (rounded to 2 digits)
-
-res_std <- res_std |>
-  select(Std_Coefficient) |>
-  mutate(Std_Coefficient = round(Std_Coefficient, 2))
+# Displaying the fit table
+model_fit_table
 
 ```
 
-### Cluster Robust Standard Errors
-
-Subsequently we compute the cluster robust standard errors (SE) to allow for correlation between observations within clusters. This means we nest the 16 responses per respondent within respondent_ids.
-
-Use the the "model_parameters" function ("parameters" package) to obtain cluster robust standard errors:
-
-* vcov should be "vcovCR"
-* vcov_args pick "CR1" for type and "dat$respondent_id" for cluster
-
-```{r}
-res <- model_parameters(res,
-                        vcov = "vcovCR",
-                        vcov_args = list(type = "CR1", cluster = data$respondent_id)
-                        ) 
-
-head(res)
-
-```
-
-## Prepring final output
-
-```{r}
-# Creating coefficient variable
-res <- res |>
-  mutate("B (β)" = paste0(B, " (", Std_Coefficient, ")")) |>
-  select(-c(B, Std_Coefficient)) |>
-  relocate("B (β)", .after = Variable)
-
-# Combining result and fit tables
-res <- rbind(res, model_fit)
-
-# Renaming variables
-res <- res |>
-  mutate(Variable = if_else(Variable == "(Intercept)", "Intercept", Variable)) |>
-  mutate(Variable = if_else(Variable == "ee_support_reception", "Perceived EE support", Variable)) |>
-  mutate(Variable = if_else(Variable == "ee_affiliation", "Affiliation to the EE", Variable)) |>
-  mutate(Variable = if_else(Variable == "ee_relationships", "Personal Relationship to EE actors", Variable)) |>
-  mutate(Variable = if_else(Variable == "altruism_potential", "Altruistic potential", Variable)) |>
-  mutate(Variable = if_else(Variable == "positive_outcome_expectation", "Expected positive outcome", Variable)) |>
-  mutate(Variable = if_else(Variable == "benefit_perception", "Perceived benefits", Variable)) |>
-  mutate(Variable = if_else(Variable == "age", "Age", Variable)) |>
-  mutate(Variable = if_else(Variable == "gender", "Gender", Variable)) |>
-  mutate(Variable = if_else(Variable == "pubfund", "Publicly funded", Variable)) |> 
-  mutate(Variable = if_else(Variable == "programpart", "Program participation", Variable)) |>
-  mutate(Variable = if_else(Variable == "startupcenter", "Startup center", Variable)) 
- 
-```
-
-## Displaying Table
-
-Use the flextable package to create a table with chained pipes:
-
-* The "autofit()" function may come in handy
-* Use "align" to right flush text of the 2nd column in the header
-* Use "align" to right flush text of the 2nd column in the body
-* Put a horizontal line below the footer "hline_bottom"
-* Set the font to "Times New Roman" and fontsize to 12
-* Output the table to word
+#### Pooled Regression Model (adding controls)
 
 ```{r}
 
+# Assuming 'data' is your dataframe
+pooled_model_with_controls <- lm(
+  eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + 
+    altruism_potential + positive_outcome_expectation + benefit_perception + 
+    age + gender + pubfund + programpart + startupcenter, data = pooled_data )
+
+# Display the summary
+summary(pooled_model_with_controls)
+
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### Multilevel Model (Comparison=)
+
+
+```{r}
+
+# Fitting the model
+multilevel_model <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + positive_outcome_expectation + benefit_perception + (1 | respondent_id) + (1 | round_id), 
+                         data = pooled_data)
+
+# Displaying the results
+tidy(multilevel_model, effects = "fixed") |> 
+  select(term, estimate, std.error)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
