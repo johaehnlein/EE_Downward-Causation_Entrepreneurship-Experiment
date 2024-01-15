@@ -579,10 +579,10 @@ profiles <- tibble(
 ```{r}
 
 first_round_data <- data |>
-  select(1:14) # Selecting data from first collection round
+  select(1:14, 23:25, 27, 34:37) # Selecting data from first collection round
 
 first_round_data <- first_round_data |>
-  pivot_longer(!c(1:6), # pivoting the data set to a long format
+  pivot_longer(!c(1:6, 15:22), # pivoting the data set to a long format
     names_to = "profile", # bringing profile numbers to profile column
     values_to = "eecontlike") |> # bringing eecontlike values to eecontlike column
   mutate(profile = as.numeric(str_extract(profile, "\\-*\\d+\\.*\\d*"))) |> # saving numeric values of profile numbers into the profile column
@@ -607,10 +607,10 @@ first_round_data <- first_round_data |>
 ```{r}
 
 second_round_data <- data |>
-  select(1:6, 15:22) # Selecting data from second collection round
+  select(1:6, 15:22, 23:25, 27, 34:37) # Selecting data from second collection round
 
 second_round_data <- second_round_data |>
-  pivot_longer(!c(1:6), # pivoting the data set to a long format
+  pivot_longer(!c(1:6, 15:22), # pivoting the data set to a long format
     names_to = "profile", # bringing profile numbers to profile column
     values_to = "eecontlike") |> # bringing eecontlike values to eecontlike column
   mutate(profile = as.numeric(str_extract(profile, "\\-*\\d+\\.*\\d*"))) |> # saving numeric values of profile numbers into the profile column
@@ -655,13 +655,17 @@ The correlation table of the model includes the dependent variable, controls as 
   *pubfund
   *programpart
   *startupcenter
-  *[CFA Factors]
+  *gen_trust
+  *self_int
+  *oth_ori
+  *ese
+  *ep
 
 
 ```{r}
 
 data |>
-  select(eecontlike, age, gender, pubfund, programpart, startupcenter) |> #selecting variables
+  select(eecontlike, age, gender, pubfund, programpart, startupcenter, gen_trust, self_int, oth_ori, ese, ep) |> #selecting variables
   apa.cor.table() #creation of correlation matrix
 
 ```
@@ -1011,7 +1015,7 @@ tidy(second_round_cluster) |>
 # Extracting relevant information from the model's results and format it as a table
 second_round_est <- tidy(second_round_cluster) |> 
   select(estimate, std.error) |>  
-  rename(Beta_second = "estimate", SE_second= "std.error")
+  rename(Beta_second = "estimate", SE_second = "std.error")
 
 ```
 
@@ -1030,7 +1034,7 @@ both_rounds_models_est
 #### Step 3: Slope Difference Test
 
 Evaluate consistency across estimated models using the first round of data collection and the second round.
-We use the process outlined by Gelman and Stern (2006) to test for a statistically significant difference between the estimate of each independent variable beta in the first round model and that in second round model. This is a simple test to evaluate whether two studies using the same instrument and similar assumptions about the population of interest (e.g., similar random draws) produce statistically similar results. The null hypothesis for the test is that $(\beta_{m1} - \beta_{m2}) = 0$ where $m1$ is the estimate of beta from the first model and $m2$ from the second. 
+We use the process outlined by Gelman and Stern (2006) to test for a statistically significant difference between the estimate of each independent variable beta in the first round model and that in second round model. This is a simple test to evaluate whether two studies using the same instrument and similar assumptions about the population of interest (e.g., similar random draws) produce statistically similar results. 
 
 Here we use the test to evaluate consistency across estimated models using the initial round of data collection and the replication round. Random variation suggests that there will be differences between the two rounds; the question for researchers is whether this variation is statistically meaningful. Even in the case of relatively low test-retest reliability, researchers may still have confidence reporting results should the models produce similar results---giving credibility to the conclusion that random variation is responsible for small differences as opposed to a more systematic concern. 
 
@@ -1082,7 +1086,7 @@ tidy(pooled_cluster) |>
 
 ```
 
-##### Reporting models
+#### Reporting model
 
 ```{r}
 
@@ -1106,35 +1110,54 @@ model_fit_table
 
 ```
 
-#### Pooled Regression Model (adding controls)
+
+#### Pooled Regression Model (adding controls & moderation testing)
 
 ```{r}
 
-# Assuming 'data' is your dataframe
-pooled_model_with_controls <- lm(
+# Fitting the model
+pooled_model_2 <- lm(
   eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + 
     altruism_potential + positive_outcome_expectation + benefit_perception + 
-    age + gender + pubfund + programpart + startupcenter, data = pooled_data )
+    age + gender + pubfund + programpart + startupcenter + 
+    gen_trust * ee_support_reception + 
+    gen_trust * ee_relationships +
+    oth_ori * altruism_potential +
+    ep * positive_outcome_expectation, 
+    data = pooled_data )
 
-# Display the summary
-summary(pooled_model_with_controls)
+# Calculating clustered standard errors at the respondent and round levels
+pooled_cluster_2 <- coeftest(pooled_model_2, vcov = vcovCL, cluster = ~ respondent_id + round_id)
+
+# Displaying the results
+tidy(pooled_cluster_2) |>
+  select(term, estimate, std.error)
 
 ```
 
+#### Reporting model
 
+```{r}
 
+# Extracting model fit statistics
+pooled_model_2_fit <- glance(pooled_model_2)
 
+# Displaying the results
+pooled_model_2_fit
 
+# Creating a fit table
+model_fit_2_table <- tibble(
+  `R-Squared` = round(pooled_model_2_fit$r.squared, 2),
+  `Adjusted R-Squared` = round(pooled_model_2_fit$adj.r.squared, 2),
+  `Sigma` = round(pooled_model_2_fit$sigma, 2),
+  `F-Statistic` = round(pooled_model_2_fit$statistic, 2),
+  `p-value` = round(pooled_model_2_fit$p.value, 2),
+)
 
+# Displaying the fit table
+model_fit_2_table
 
-
-
-
-
-
-
-
-
+```
 
 
 
