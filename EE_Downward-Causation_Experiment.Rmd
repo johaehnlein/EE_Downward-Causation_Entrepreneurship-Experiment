@@ -166,7 +166,7 @@ data <- data |>
   filter(duration <= duration_higher)
 ```
 
-### Sample Size (Wave 1)
+### Sample Size 
 
 ```{r}
 nrow(data)
@@ -417,19 +417,8 @@ data <- data |>
 cfa_model <- "gen_trust =~ gentrust1 + gentrust2 + gentrust3 + gentrust4 + gentrust5 + gentrust6
               self_int =~ selfint1 + selfint2 + selfint3
               oth_ori =~ othori1 + othori2 + othori3
-              ex_or =~ exor1 + exor2 + exor3 + exor4 + exor5 + exor6 + exor7 + exor8 + exor9
-              ese =~ ese1 + ese2 + ese3 + ese4
-              ipf_inv =~ ipfinv1 + ipfinv2 + ipfinv3 + ipfinv4
-              ic_inv =~ icinv
-              ipf_fnd =~ ipffnd1 + ipffnd2 + ipffnd3 + ipffnd1
-              ic_fnd =~ icfnd
-              ipf_dev =~ ipfdev1 + ipfdev2 + ipfdev3
-              ic_dev =~ icdev
-              ep_inv =~ ipf_inv + ic_inv
-              ep_fnd =~ ipf_fnd + ic_fnd
-              ep_dev =~ ipf_dev +   ic_dev
-              ep =~ ep_inv + ep_fnd + ep_dev"
-                
+              ese =~ ese1 + ese2 + ese3 + ese4"
+
 ```
 
 
@@ -444,63 +433,6 @@ summary(cfa_fit, fit.measures = TRUE)
 
 ```
 
-```{r}
-
-# creating scale vectors
-
-general_trust_scale <- data[, c("gentrust1", "gentrust2", "gentrust3", "gentrust4", "gentrust5", "gentrust6")]
-
-self_interest_scale <- data[, c("selfint1", "selfint2", "selfint3")]
-
-other_orientation_scale <- data[, c("othori1", "othori2", "othori3")]
-
-exchange_orientation_scale <- data[, c("exor1", "exor2", "exor3", "exor4", "exor5", "exor6", "exor7", "exor8", "exor9")]
-
-self_efficacy_scale <- data[, c("ese1", "ese2", "ese3", "ese4")]
- 
-ipf_founding_scale <- data[, c("ipffnd1", "ipffnd2","ipffnd3")]
-
-ipf_developing_scale <- data[, c("ipfdev1", "ipfdev2", "ipfdev3")]
-
-ipf_inventing_scale <- data[, c("ipfinv1", "ipfinv2","ipfinv3","ipfinv4")]
-
-# Computing Cronbach's alpha
-
-alpha_general_trust_scale <- alpha(general_trust_scale)
- 
-alpha_self_interest_scale <- alpha(self_interest_scale)
-
-alpha_other_orientation_scale <- alpha(other_orientation_scale)
-
-alpha_exchange_orientation_scale <- alpha(exchange_orientation_scale)
-
-alpha_self_efficacy_scale <- alpha(self_efficacy_scale)
-
-alpha_ipf_founding_scale <- alpha(ipf_founding_scale)
-
-alpha_ipf_developing_scale <- alpha(ipf_developing_scale)
-
-alpha_ipf_inventing_scale <- alpha(ipf_inventing_scale)
-
-# Displaying summary of Cronbach's Alpha for each scale
-
-alpha_results <- data.frame(
-  Scale = c("General Trust", "Self Interest", "Other Orientation", 
-            "Exchange Orientation", "Self Efficacy", "IPF Founding", 
-            "IPF Developing", "IPF Inventing"),
-  Cronbachs_Alpha = c(alpha_general_trust_scale$total$raw_alpha,
-                      alpha_self_interest_scale$total$raw_alpha,
-                      alpha_other_orientation_scale$total$raw_alpha,
-                      alpha_exchange_orientation_scale$total$raw_alpha,
-                      alpha_self_efficacy_scale$total$raw_alpha,
-                      alpha_ipf_founding_scale$total$raw_alpha,
-                      alpha_ipf_developing_scale$total$raw_alpha,
-                      alpha_ipf_inventing_scale$total$raw_alpha))
-
-# Print the summary table
-print(alpha_results)
-
-```
 
 ### Standardization of results
 
@@ -561,6 +493,87 @@ data <- data |>
 ### Calculating Cronbach's alpha
 
 Cronbach's alpha is a measure of internal consistency, that is, how closely related a set of items are as a group. It is considered to be a measure of scale reliability or consistency. A higher Cronbach's alpha value indicates greater internal consistency, often interpreted as the measure of the scale being more reliable.
+
+
+```{r}
+
+# creating scale vectors
+
+general_trust_scale <- data[, c("gentrust1", "gentrust2", "gentrust3", "gentrust4", "gentrust5", "gentrust6")]
+
+self_interest_scale <- data[, c("selfint1", "selfint2", "selfint3")]
+
+other_orientation_scale <- data[, c("othori1", "othori2", "othori3")]
+
+exchange_orientation_scale <- data[, c("exor1", "exor2", "exor3", "exor4", "exor5", "exor6", "exor7", "exor8", "exor9")]
+
+self_efficacy_scale <- data[, c("ese1", "ese2", "ese3", "ese4")]
+ 
+ipf_founding_scale <- data[, c("ipffnd1", "ipffnd2","ipffnd3")]
+
+ipf_developing_scale <- data[, c("ipfdev1", "ipfdev2", "ipfdev3")]
+
+ipf_inventing_scale <- data[, c("ipfinv1", "ipfinv2","ipfinv3","ipfinv4")]
+
+ep_founding_scale <- data[,c("ipf_fnd", "ic_fnd")]
+
+ep_developing_scale <- data[,c("ipf_dev", "ic_dev")]
+
+ep_inventing_scale <- data[,c("ipf_inv", "ic_inv")]
+
+ep_scale <- data[,c("ep_fnd", "ep_dev", "ep_inv")]
+
+# Computing Cronbach's alpha
+
+alpha_general_trust_scale <- alpha(general_trust_scale)
+ 
+alpha_self_interest_scale <- alpha(self_interest_scale)
+
+alpha_other_orientation_scale <- alpha(other_orientation_scale)
+
+alpha_exchange_orientation_scale <- alpha(exchange_orientation_scale)
+
+alpha_self_efficacy_scale <- alpha(self_efficacy_scale)
+
+alpha_ipf_founding_scale <- alpha(ipf_founding_scale)
+
+alpha_ipf_developing_scale <- alpha(ipf_developing_scale)
+
+alpha_ipf_inventing_scale <- alpha(ipf_inventing_scale)
+
+alpha_ep_founding_scale <- alpha(ep_founding_scale)
+
+alpha_ep_developing_scale <- alpha(ep_developing_scale)
+
+alpha_ep_inventing_scale <- alpha(ep_inventing_scale)
+
+alpha_ep_scale <- alpha(ep_scale)
+
+
+# Displaying summary of Cronbach's Alpha for each scale
+
+alpha_results <- data.frame(
+  Scale = c("General Trust", "Self Interest", "Other Orientation", 
+            "Exchange Orientation", "Self Efficacy", "IPF Founding", 
+            "IPF Developing", "IPF Inventing", "EP Founding", "EP Developing", "EP Inventing", "EP"),
+  Cronbachs_Alpha = c(alpha_general_trust_scale$total$raw_alpha,
+                      alpha_self_interest_scale$total$raw_alpha,
+                      alpha_other_orientation_scale$total$raw_alpha,
+                      alpha_exchange_orientation_scale$total$raw_alpha,
+                      alpha_self_efficacy_scale$total$raw_alpha,
+                      alpha_ipf_founding_scale$total$raw_alpha,
+                      alpha_ipf_developing_scale$total$raw_alpha,
+                      alpha_ipf_inventing_scale$total$raw_alpha,
+                      alpha_ep_founding_scale$total$raw_alpha,
+                      alpha_ep_developing_scale$total$raw_alpha,
+                      alpha_ep_inventing_scale$total$raw_alpha,
+                      alpha_ep_scale$total$raw_alpha
+                      ))
+
+# Print the summary table
+print(alpha_results)
+
+```
 
 
 ### Removing the indicators from the dataset
