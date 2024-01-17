@@ -414,7 +414,7 @@ data <- data |>
 
 # CFA model
 
-cfa_model <- "gen_trust =~ gentrust1 + gentrust2 + gentrust1 + gentrust4 + gentrust5 + gentrust6
+cfa_model <- "gen_trust =~ gentrust1 + gentrust2 + gentrust3 + gentrust4 + gentrust5 + gentrust6
               self_int =~ selfint1 + selfint2 + selfint3
               oth_ori =~ othori1 + othori2 + othori3
               ex_or =~ exor1 + exor2 + exor3 + exor4 + exor5 + exor6 + exor7 + exor8 + exor9
@@ -441,6 +441,64 @@ cfa_model <- "gen_trust =~ gentrust1 + gentrust2 + gentrust1 + gentrust4 + gentr
 cfa_fit <- cfa(cfa_model, data = data)
 
 summary(cfa_fit, fit.measures = TRUE)
+
+```
+
+```{r}
+
+# creating scale vectors
+
+general_trust_scale <- data[, c("gentrust1", "gentrust2", "gentrust3", "gentrust4", "gentrust5", "gentrust6")]
+
+self_interest_scale <- data[, c("selfint1", "selfint2", "selfint3")]
+
+other_orientation_scale <- data[, c("othori1", "othori2", "othori3")]
+
+exchange_orientation_scale <- data[, c("exor1", "exor2", "exor3", "exor4", "exor5", "exor6", "exor7", "exor8", "exor9")]
+
+self_efficacy_scale <- data[, c("ese1", "ese2", "ese3", "ese4")]
+ 
+ipf_founding_scale <- data[, c("ipffnd1", "ipffnd2","ipffnd3")]
+
+ipf_developing_scale <- data[, c("ipfdev1", "ipfdev2", "ipfdev3")]
+
+ipf_inventing_scale <- data[, c("ipfinv1", "ipfinv2","ipfinv3","ipfinv4")]
+
+# Computing Cronbach's alpha
+
+alpha_general_trust_scale <- alpha(general_trust_scale)
+ 
+alpha_self_interest_scale <- alpha(self_interest_scale)
+
+alpha_other_orientation_scale <- alpha(other_orientation_scale)
+
+alpha_exchange_orientation_scale <- alpha(exchange_orientation_scale)
+
+alpha_self_efficacy_scale <- alpha(self_efficacy_scale)
+
+alpha_ipf_founding_scale <- alpha(ipf_founding_scale)
+
+alpha_ipf_developing_scale <- alpha(ipf_developing_scale)
+
+alpha_ipf_inventing_scale <- alpha(ipf_inventing_scale)
+
+# Displaying summary of Cronbach's Alpha for each scale
+
+alpha_results <- data.frame(
+  Scale = c("General Trust", "Self Interest", "Other Orientation", 
+            "Exchange Orientation", "Self Efficacy", "IPF Founding", 
+            "IPF Developing", "IPF Inventing"),
+  Cronbachs_Alpha = c(alpha_general_trust_scale$total$raw_alpha,
+                      alpha_self_interest_scale$total$raw_alpha,
+                      alpha_other_orientation_scale$total$raw_alpha,
+                      alpha_exchange_orientation_scale$total$raw_alpha,
+                      alpha_self_efficacy_scale$total$raw_alpha,
+                      alpha_ipf_founding_scale$total$raw_alpha,
+                      alpha_ipf_developing_scale$total$raw_alpha,
+                      alpha_ipf_inventing_scale$total$raw_alpha))
+
+# Print the summary table
+print(alpha_results)
 
 ```
 
@@ -499,6 +557,11 @@ data <- data |>
   ungroup()
   
 ```
+
+### Calculating Cronbach's alpha
+
+Cronbach's alpha is a measure of internal consistency, that is, how closely related a set of items are as a group. It is considered to be a measure of scale reliability or consistency. A higher Cronbach's alpha value indicates greater internal consistency, often interpreted as the measure of the scale being more reliable.
+
 
 ### Removing the indicators from the dataset
 
@@ -945,7 +1008,7 @@ bind_rows(profile1_icc,
 
 ### Step 2: Linear Model with clustered standard errors
 
-In this step we calculate a simple linear model for each round of data, capture those results, and display them in a table. The purpose of this step is to capture the parameter estimates---beta coefficients---to use for the slope difference test. 
+In this step we calculate a simple linear model for each round of data, capture those results, and display them in a table. The purpose of this step is to capture the parameter estimates (beta coefficients) to use for the slope difference test. 
 
 #### First Round
 
