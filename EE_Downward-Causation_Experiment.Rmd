@@ -53,7 +53,7 @@ library(flextable) # Used for table creation
 ## Read Data
 
 ```{r}
-data <- read.xlsx("Data_EE Downward Causation_Conjoint_Wave2.xlsx")
+data <- read.xlsx("Data_EE Downward Causation_Conjoint_Wave3.xlsx")
 ```
 
 ## Inspect Data
@@ -357,7 +357,6 @@ data <- data |>
   select(-c(busexp)) |>
   select(-c(amountfound)) |>
   select(-c(compfound)) |>
-  select(-c(compage)) |>
   select(-c(compcity)) |>
   select(-c(bogus1)) |>
   select(-c(sudoku)) |>
@@ -401,6 +400,8 @@ Subsequently we conduct a confirmatory factor analysis (CFA) to evaluate the fac
 ### Description of CFA model
 
 
+#### CFA model (V1)
+
 ```{r}
 
 # Score reversion of exchange orientation items as indicated by the original scales (Clark & Mills, 2012)
@@ -409,10 +410,82 @@ data <- data |>
   mutate(  exor3 = 8 - exor3,
     exor4 = 8 - exor4,
     exor5 = 8 - exor5,
-    exor9 = 8 - exor9
-  ) 
+    exor9 = 8 - exor9)
 
-# CFA model
+```
+
+
+
+```{r}
+
+
+# CFA model (V1)
+
+cfa_model_all <- "gen_trust =~ gentrust1 + gentrust2 + gentrust1 + gentrust4 + gentrust5 + gentrust6
+              self_int =~ selfint1 + selfint2 + selfint3
+              oth_ori =~ othori1 + othori2 + othori3
+              ex_or =~ exor1 + exor2 + exor3 + exor4 + exor5 + exor6 + exor7 + exor8 + exor9
+              ese =~ ese1 + ese2 + ese3 + ese4
+              ipf_inv =~ ipfinv1 + ipfinv2 + ipfinv3 + ipfinv4
+              ic_inv =~ icinv
+              ipf_fnd =~ ipffnd1 + ipffnd2 + ipffnd3 + ipffnd1
+              ic_fnd =~ icfnd
+              ipf_dev =~ ipfdev1 + ipfdev2 + ipfdev3
+              ic_dev =~ icdev
+              ep_inv =~ ipf_inv + ic_inv
+              ep_fnd =~ ipf_fnd + ic_fnd
+              ep_dev =~ ipf_dev +   ic_dev
+              ep =~ ep_inv + ep_fnd + ep_dev"
+                
+```
+
+#### Model fit information (V1)
+
+```{r}
+
+cfa_all_fit <- cfa(cfa_model_all, data = data)
+
+summary(cfa_all_fit, fit.measures = TRUE)
+
+```
+
+### Standardization of results
+
+```{r}
+
+cfa_all_fit <- standardizedsolution(cfa_all_fit)
+
+summary(cfa_all_fit, fit.measures = TRUE)
+
+```
+
+#### CFA: Results Overview in a table
+
+```{r}
+
+cfa_all_fit <- cfa_all_fit |>
+  filter(op == "=~") |>
+  select(latent_var = lhs, indicators = rhs, std_loading = est.std ) |>
+  mutate(std_loading = round(std_loading, 2))
+
+cfa_all_fit_table <- flextable(cfa_all_fit) |>
+  autofit() |>
+  color(part = "header", color = "white") |>
+  bg(part = "header", bg = "gray") |>
+  align(align = "center", part = "all") |>
+  fontsize(size = 12, part = "all")
+
+print(cfa_all_fit_table)
+
+```
+
+
+
+#### CFA model (V2)
+
+```{r}
+
+# CFA model (v2)
 
 cfa_model <- "gen_trust =~ gentrust1 + gentrust2 + gentrust3 + gentrust4 + gentrust5 + gentrust6
               self_int =~ selfint1 + selfint2 + selfint3
@@ -422,8 +495,7 @@ cfa_model <- "gen_trust =~ gentrust1 + gentrust2 + gentrust3 + gentrust4 + gentr
 ```
 
 
-
-### Model fit information
+#### Model fit information (V2)
 
 ```{r}
 
@@ -434,7 +506,7 @@ summary(cfa_fit, fit.measures = TRUE)
 ```
 
 
-### Standardization of results
+### Standardization of results (V2)
 
 ```{r}
 
@@ -444,7 +516,7 @@ summary(cfa_fit, fit.measures = TRUE)
 
 ```
 
-### CFA: Results Overview in a table
+### CFA: Results Overview in a table (V2)
 
 ```{r}
 
@@ -463,6 +535,76 @@ cfa_fit_table <- flextable(cfa_fit) |>
 print(cfa_fit_table)
 
 ```
+
+
+### Calculating Cronbach's alpha
+
+Cronbach's alpha is a measure of internal consistency, that is, how closely related a set of items are as a group. It is considered to be a measure of scale reliability or consistency. A higher Cronbach's alpha value indicates greater internal consistency, often interpreted as the measure of the scale being more reliable.
+
+```{r}
+
+# creating scale vectors
+
+general_trust_scale <- data[, c("gentrust1", "gentrust2", "gentrust3", "gentrust4", "gentrust5", "gentrust6")]
+
+self_interest_scale <- data[, c("selfint1", "selfint2", "selfint3")]
+
+other_orientation_scale <- data[, c("othori1", "othori2", "othori3")]
+
+exchange_orientation_scale <- data[, c("exor1", "exor2", "exor3", "exor4", "exor5", "exor6", "exor7", "exor8", "exor9")]
+
+self_efficacy_scale <- data[, c("ese1", "ese2", "ese3", "ese4")]
+ 
+ipf_founding_scale <- data[, c("ipffnd1", "ipffnd2","ipffnd3")]
+
+ipf_developing_scale <- data[, c("ipfdev1", "ipfdev2", "ipfdev3")]
+
+ipf_inventing_scale <- data[, c("ipfinv1", "ipfinv2","ipfinv3","ipfinv4")]
+
+
+# Computing Cronbach's alpha
+
+alpha_general_trust_scale <- alpha(general_trust_scale)
+ 
+alpha_self_interest_scale <- alpha(self_interest_scale)
+
+alpha_other_orientation_scale <- alpha(other_orientation_scale)
+
+alpha_exchange_orientation_scale <- alpha(exchange_orientation_scale)
+
+alpha_self_efficacy_scale <- alpha(self_efficacy_scale)
+
+alpha_ipf_founding_scale <- alpha(ipf_founding_scale)
+
+alpha_ipf_developing_scale <- alpha(ipf_developing_scale)
+
+alpha_ipf_inventing_scale <- alpha(ipf_inventing_scale)
+
+
+
+# Displaying summary of Cronbach's Alpha for each scale
+
+alpha_results <- data(
+  Scale = c("General Trust", "Self Interest", "Other Orientation", 
+            "Exchange Orientation", "Self Efficacy", "IPF Founding", 
+            "IPF Developing", "IPF Inventing", "EP Founding", "EP Developing", "EP Inventing", "EP"),
+  Cronbachs_Alpha = c(alpha_general_trust_scale$total$raw_alpha,
+                      alpha_self_interest_scale$total$raw_alpha,
+                      alpha_other_orientation_scale$total$raw_alpha,
+                      alpha_exchange_orientation_scale$total$raw_alpha,
+                      alpha_self_efficacy_scale$total$raw_alpha,
+                      alpha_ipf_founding_scale$total$raw_alpha,
+                      alpha_ipf_developing_scale$total$raw_alpha,
+                      alpha_ipf_inventing_scale$total$raw_alpha,
+                      ))
+
+# Print the summary table
+print(alpha_results)
+
+```
+
+
+
 
 ## Aggregation of indicators to composites
 
@@ -488,91 +630,6 @@ data <- data |>
   mutate(ep = mean(c(ep_inv, ep_fnd, ep_dev))) |>
   ungroup()
   
-```
-
-### Calculating Cronbach's alpha
-
-Cronbach's alpha is a measure of internal consistency, that is, how closely related a set of items are as a group. It is considered to be a measure of scale reliability or consistency. A higher Cronbach's alpha value indicates greater internal consistency, often interpreted as the measure of the scale being more reliable.
-
-
-```{r}
-
-# creating scale vectors
-
-general_trust_scale <- data[, c("gentrust1", "gentrust2", "gentrust3", "gentrust4", "gentrust5", "gentrust6")]
-
-self_interest_scale <- data[, c("selfint1", "selfint2", "selfint3")]
-
-other_orientation_scale <- data[, c("othori1", "othori2", "othori3")]
-
-exchange_orientation_scale <- data[, c("exor1", "exor2", "exor3", "exor4", "exor5", "exor6", "exor7", "exor8", "exor9")]
-
-self_efficacy_scale <- data[, c("ese1", "ese2", "ese3", "ese4")]
- 
-ipf_founding_scale <- data[, c("ipffnd1", "ipffnd2","ipffnd3")]
-
-ipf_developing_scale <- data[, c("ipfdev1", "ipfdev2", "ipfdev3")]
-
-ipf_inventing_scale <- data[, c("ipfinv1", "ipfinv2","ipfinv3","ipfinv4")]
-
-ep_founding_scale <- data[,c("ipf_fnd", "ic_fnd")]
-
-ep_developing_scale <- data[,c("ipf_dev", "ic_dev")]
-
-ep_inventing_scale <- data[,c("ipf_inv", "ic_inv")]
-
-ep_scale <- data[,c("ep_fnd", "ep_dev", "ep_inv")]
-
-# Computing Cronbach's alpha
-
-alpha_general_trust_scale <- alpha(general_trust_scale)
- 
-alpha_self_interest_scale <- alpha(self_interest_scale)
-
-alpha_other_orientation_scale <- alpha(other_orientation_scale)
-
-alpha_exchange_orientation_scale <- alpha(exchange_orientation_scale)
-
-alpha_self_efficacy_scale <- alpha(self_efficacy_scale)
-
-alpha_ipf_founding_scale <- alpha(ipf_founding_scale)
-
-alpha_ipf_developing_scale <- alpha(ipf_developing_scale)
-
-alpha_ipf_inventing_scale <- alpha(ipf_inventing_scale)
-
-alpha_ep_founding_scale <- alpha(ep_founding_scale)
-
-alpha_ep_developing_scale <- alpha(ep_developing_scale)
-
-alpha_ep_inventing_scale <- alpha(ep_inventing_scale)
-
-alpha_ep_scale <- alpha(ep_scale)
-
-
-# Displaying summary of Cronbach's Alpha for each scale
-
-alpha_results <- data.frame(
-  Scale = c("General Trust", "Self Interest", "Other Orientation", 
-            "Exchange Orientation", "Self Efficacy", "IPF Founding", 
-            "IPF Developing", "IPF Inventing", "EP Founding", "EP Developing", "EP Inventing", "EP"),
-  Cronbachs_Alpha = c(alpha_general_trust_scale$total$raw_alpha,
-                      alpha_self_interest_scale$total$raw_alpha,
-                      alpha_other_orientation_scale$total$raw_alpha,
-                      alpha_exchange_orientation_scale$total$raw_alpha,
-                      alpha_self_efficacy_scale$total$raw_alpha,
-                      alpha_ipf_founding_scale$total$raw_alpha,
-                      alpha_ipf_developing_scale$total$raw_alpha,
-                      alpha_ipf_inventing_scale$total$raw_alpha,
-                      alpha_ep_founding_scale$total$raw_alpha,
-                      alpha_ep_developing_scale$total$raw_alpha,
-                      alpha_ep_inventing_scale$total$raw_alpha,
-                      alpha_ep_scale$total$raw_alpha
-                      ))
-
-# Print the summary table
-print(alpha_results)
-
 ```
 
 
@@ -655,10 +712,10 @@ profiles <- tibble(
 ```{r}
 
 first_round_data <- data |>
-  select(1:14, 23:25, 27, 34:37) # Selecting data from first collection round
+  select(1:15, 24:26, 28) # Selecting data from first collection round
 
 first_round_data <- first_round_data |>
-  pivot_longer(!c(1:6, 15:22), # pivoting the data set to a long format
+  pivot_longer(!c(1:7, 16:19), # pivoting the data set to a long format
     names_to = "profile", # bringing profile numbers to profile column
     values_to = "eecontlike") |> # bringing eecontlike values to eecontlike column
   mutate(profile = as.numeric(str_extract(profile, "\\-*\\d+\\.*\\d*"))) |> # saving numeric values of profile numbers into the profile column
@@ -683,10 +740,10 @@ first_round_data <- first_round_data |>
 ```{r}
 
 second_round_data <- data |>
-  select(1:6, 15:22, 23:25, 27, 34:37) # Selecting data from second collection round
+  select(1:7, 16:23, 24:26, 28) # Selecting data from second collection round
 
 second_round_data <- second_round_data |>
-  pivot_longer(!c(1:6, 15:22), # pivoting the data set to a long format
+  pivot_longer(!c(1:7, 16:19), # pivoting the data set to a long format
     names_to = "profile", # bringing profile numbers to profile column
     values_to = "eecontlike") |> # bringing eecontlike values to eecontlike column
   mutate(profile = as.numeric(str_extract(profile, "\\-*\\d+\\.*\\d*"))) |> # saving numeric values of profile numbers into the profile column
@@ -728,6 +785,7 @@ The correlation table of the model includes the dependent variable, controls as 
   *eecontlike
   *age
   *gender
+  *compage
   *pubfund
   *programpart
   *startupcenter
@@ -735,13 +793,13 @@ The correlation table of the model includes the dependent variable, controls as 
   *self_int
   *oth_ori
   *ese
-  *ep
+ 
 
 
 ```{r}
 
 data |>
-  select(eecontlike, age, gender, pubfund, programpart, startupcenter, gen_trust, self_int, oth_ori, ese, ep) |> #selecting variables
+  select(eecontlike, age, gender, compage, pubfund, programpart, gen_trust, self_int, oth_ori, ese) |> #selecting variables
   apa.cor.table() #creation of correlation matrix
 
 ```
@@ -1187,6 +1245,25 @@ model_fit_table
 ```
 
 
+#### Multilevel Model (Comparison)
+
+
+```{r}
+
+# Fitting the model
+multilevel_model <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + positive_outcome_expectation + benefit_perception + (1 | respondent_id) + (1 | round_id), 
+                         data = pooled_data)
+
+# Displaying the results
+tidy(multilevel_model, effects = "fixed") |> 
+  select(term, estimate, std.error)
+```
+
+
+
+
+
+
 #### Pooled Regression Model (adding controls & moderation testing)
 
 ```{r}
@@ -1195,11 +1272,7 @@ model_fit_table
 pooled_model_2 <- lm(
   eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + 
     altruism_potential + positive_outcome_expectation + benefit_perception + 
-    age + gender + pubfund + programpart + startupcenter + 
-    gen_trust * ee_support_reception + 
-    gen_trust * ee_relationships +
-    oth_ori * altruism_potential +
-    ep * positive_outcome_expectation, 
+    age + gender + pubfund + programpart + compage + gen_trust + oth_ori + self_int + ese, 
     data = pooled_data )
 
 # Calculating clustered standard errors at the respondent and round levels
@@ -1235,23 +1308,6 @@ model_fit_2_table
 
 ```
 
-
-
-
-
-#### Multilevel Model (Comparison=)
-
-
-```{r}
-
-# Fitting the model
-multilevel_model <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + positive_outcome_expectation + benefit_perception + (1 | respondent_id) + (1 | round_id), 
-                         data = pooled_data)
-
-# Displaying the results
-tidy(multilevel_model, effects = "fixed") |> 
-  select(term, estimate, std.error)
-```
 
 
 

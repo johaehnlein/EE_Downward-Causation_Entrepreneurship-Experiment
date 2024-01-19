@@ -1,0 +1,372 @@
+---
+title: "EE_Downward-Causation_Experiment_Data Comparison"
+author: "Johannes Haehnlein"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# In this R markdown, we test the reliabilty of our data, by comparing both data sets.
+
+# Libraries
+
+```{r}
+library(openxlsx) # Used to import and export excel files
+library(tidyverse) # Used to load all tidyverse packages
+library(lavaan) # Used to perform confirmatory factor analyses
+library(psych) # Used to calculate Cronbach's Alpha and ICC values
+library(apaTables) # Used to create correlation tables
+library(lme4) # Used for multilevel modeling 
+library(lmerTest) # Used for multilevel regression adding p-values to the lme4 package
+library(lmtest) # For calculating robust standard errors
+library(broom) # Used to create tidy data frames with model results
+library(broom.mixed) # Used to tidy result objects for multilevel modeling
+library(parameters) # Used to augement regression analyses
+library(performance) # Used to  obtain R2 for multilevel models
+library(knitr) # Used for table creation
+library(clubSandwich) # Used for cluster robust standard errors
+library(sandwich) # Used for cluster robust standard errors
+library(flextable) # Used for table creation
+```
+
+# Data
+
+## Read Data
+
+```{r}
+data_manual <- read.xlsx("Data_EE Downward Causation_Conjoint_Wave2.xlsx")
+```
+
+## Inspect Data
+
+### Code Book
+
+* age = Age of the subject
+* gender = Gender of the subject
+* education = Highest education grade
+* busexp = Years of business experience of the entrepreneur
+* compfound = Respondent being an entrepreneur
+* amountfound = Amount fo founded companies
+* compage = Years since (last) startup foundation
+* compact = Ongoing activity of the entrepreneur in his startup
+* role = Function of the entrepreneur in his startup
+* compcity = city of company headquarters
+* amountemp = Amount of employees in the entrepreneurs startup
+* pubfund1 = public funding by a funding program in germany
+* programpart = Participation in an accleration or incubation program
+* startupcenter = Being in located in a startup or technology center
+* eecontlik = Conjoint Card 1-8 (Assessment of likelihood to engage in the EE contribution behavior)
+* eecontlikrep = Replication Conjoint Card 1-8 (Assessment of likelihood to engage in the EE contribution behavior)
+* ee_support_reception = Perceived EE support
+* ee_affiliation = Affiliation to the EE
+* ee_relationships = Personal Relationship to EE actors
+* altruism_potential = Altruistic potential
+* positive_outcome_expectation = Expected positive outcome of the activity
+* benefit_perception = Perceived benefits of the entrepreneur
+* evaluation_scenexp = Experience of the described scenario
+* evaluation_scenpract = Practicability of the described scenario
+* evaluation_studreal = Realism of the described study
+* evaluation_critund = Understandability of decision criteria
+* evaluation_fun = Fun factor of the study
+* ipfinvx = Intense Positive Feeling towards inventing (4 items)
+* ipffndx = Intense Positive Feeling towards founding (3 items)
+* ipfdev = Intense Positive Feeling towards developing (3 items)
+* esex = Entrepreneurial Self-Efficacy (4 items)
+* ic_inv = Identity Centrality inventing
+* ic_fnd = Identity Centrality founding
+* ic_dev = Identity Centrality developing
+* ex_orx = Exchange Orientation (9 items)
+* selfintx = Self-Interest (3 items)
+* othorix = Other Orientation (3 Items)
+* gentrustx = General Trust Scale (6 Items)
+* bogusx = Bogus Item 1 & 3
+* sudoku = Bogus Item 2
+* duration = time to complete survey (min)
+
+### Variable names
+
+```{r}
+colnames(data_manual)
+```
+
+# Data Preparation for Analysis
+
+## Harmonize Variable Names
+
+```{r}
+data_manual <- data_manual |>
+  rename_all(.funs = tolower) |> # Convert all column names to lower case
+  rename("role" = "function") |> # Convert variable "function" to "role"
+  rename("icfnd" = "ic_icfnd") |>
+  rename("icdev" = "ic_icdev") |>
+  rename("icinv" = "ic_icinv") |>
+  rename("pubfund" = "pubfund1") |>
+  rename("scenexp" = "evaluation_scenexp") |>
+  rename("scenpract" = "evaluation_scenpract") |>
+  rename("studreal" = "evaluation_studreal") |>
+  rename("critund" = "evaluation_critund") |>
+  rename("fun" = "evaluation_fun") |>
+  rowid_to_column(var = "respondent_id") # Create id column
+```
+
+## Remove effortless responses
+
+In order to ensure data quality, respondents with low survey engagement shall be removed from the sample. To check these effortless respondents, we included three bogus items (attention checks) in our survey. We remove all respondents who failed the bogus. Also we remove respondents, who finished the survey too fast or too slow. Based on the survey's pre-test the estimated completion time was between 12 and 20 minutes. According to this, we will remove all respondents, who completed the survey in less than 8 minutes and in more than 40 minutes.
+
+### Remove failed bogus item responses
+
+```{r}
+data_manual <- filter(data_manual, bogus1 == 6) # Remove all respondent failing bogus item 1
+data_manual <- filter(data_manual, sudoku == 4) # Remove all respondent failing bogus item 2
+data_manual <- filter(data_manual, evaluation_bogus3 == 4) # Remove all respondent failing bogus item 2
+data_manual <- filter(data_manual, bogus3 == 4) # Remove all respondent failing bogus item 4
+```
+
+### Remove too fast or too slow conducting respondents
+
+```{r}
+duration_lower <- 8 # response time lower than 8 minutes
+duration_higher <- 40 # response time higher than 40 minutes
+```
+
+```{r}
+time_out_lower <- data_manual |>
+  filter(duration > duration_lower) |>
+  nrow()
+```
+
+```{r}
+time_out_higher <- data_manual |>
+  filter(duration < duration_higher) |>
+  nrow()
+```
+
+```{r}
+data_manual <- data_manual |>
+  filter(duration >= duration_lower) |>
+  filter(duration <= duration_higher)
+```
+
+### Sample Size (Wave 1)
+
+```{r}
+nrow(data_manual)
+```
+
+
+## Read Data Set 2
+
+```{r}
+data_prolific <- read.xlsx("Data_EE Downward Causation_Conjoint_Prolific.xlsx")
+```
+
+## Inspect Data
+
+### Code Book
+
+* age = Age of the subject
+* gender = Gender of the subject
+* education = Highest education grade
+* busexp = Years of business experience of the entrepreneur
+* compfound = Respondent being an entrepreneur
+* amountfound = Amount fo founded companies
+* compage = Years since (last) startup foundation
+* compact = Ongoing activity of the entrepreneur in his startup
+* role = Function of the entrepreneur in his startup
+* compcity = city of company headquarters
+* amountemp = Amount of employees in the entrepreneurs startup
+* pubfund1 = public funding by a funding program in germany
+* programpart = Participation in an accleration or incubation program
+* startupcenter = Being in located in a startup or technology center
+* eecontlik = Conjoint Card 1-8 (Assessment of likelihood to engage in the EE contribution behavior)
+* eecontlikrep = Replication Conjoint Card 1-8 (Assessment of likelihood to engage in the EE contribution behavior)
+* ee_support_reception = Perceived EE support
+* ee_affiliation = Affiliation to the EE
+* ee_relationships = Personal Relationship to EE actors
+* altruism_potential = Altruistic potential
+* positive_outcome_expectation = Expected positive outcome of the activity
+* benefit_perception = Perceived benefits of the entrepreneur
+* evaluation_scenexp = Experience of the described scenario
+* evaluation_scenpract = Practicability of the described scenario
+* evaluation_studreal = Realism of the described study
+* evaluation_critund = Understandability of decision criteria
+* evaluation_fun = Fun factor of the study
+* ipfinvx = Intense Positive Feeling towards inventing (4 items)
+* ipffndx = Intense Positive Feeling towards founding (3 items)
+* ipfdev = Intense Positive Feeling towards developing (3 items)
+* esex = Entrepreneurial Self-Efficacy (4 items)
+* ic_inv = Identity Centrality inventing
+* ic_fnd = Identity Centrality founding
+* ic_dev = Identity Centrality developing
+* ex_orx = Exchange Orientation (9 items)
+* selfintx = Self-Interest (3 items)
+* othorix = Other Orientation (3 Items)
+* gentrustx = General Trust Scale (6 Items)
+* bogusx = Bogus Item 1 & 3
+* sudoku = Bogus Item 2
+* duration = time to complete survey (min)
+
+### Variable names
+
+```{r}
+colnames(data_prolific)
+```
+
+# Data Preparation for Analysis
+
+## Harmonize Variable Names
+
+```{r}
+data_prolific <- data_prolific |>
+  rename_all(.funs = tolower) |> # Convert all column names to lower case
+  rename("role" = "function") |> # Convert variable "function" to "role"
+  rename("icfnd" = "ic_icfnd") |>
+  rename("icdev" = "ic_icdev") |>
+  rename("icinv" = "ic_icinv") |>
+  rename("pubfund" = "pubfund1") |>
+  rename("scenexp" = "evaluation_scenexp") |>
+  rename("scenpract" = "evaluation_scenpract") |>
+  rename("studreal" = "evaluation_studreal") |>
+  rename("critund" = "evaluation_critund") |>
+  rename("fun" = "evaluation_fun") |>
+  rowid_to_column(var = "respondent_id") # Create id column
+```
+
+## Remove effortless responses
+
+In order to ensure data quality, respondents with low survey engagement shall be removed from the sample. To check these effortless respondents, we included three bogus items (attention checks) in our survey. We remove all respondents who failed the bogus. Also we remove respondents, who finished the survey too fast or too slow. Based on the survey's pre-test the estimated completion time was between 12 and 20 minutes. According to this, we will remove all respondents, who completed the survey in less than 8 minutes and in more than 40 minutes.
+
+### Remove failed bogus item responses
+
+```{r}
+data_prolific <- filter(data_prolific, bogus1 == 6) # Remove all respondent failing bogus item 1
+data_prolific <- filter(data_prolific, sudoku == 4) # Remove all respondent failing bogus item 2
+data_prolific <- filter(data_prolific, evaluation_bogus3 == 4) # Remove all respondent failing bogus item 2
+data_prolific <- filter(data_prolific, bogus3 == 4) # Remove all respondent failing bogus item 4
+```
+
+### Remove too fast or too slow conducting respondents
+
+```{r}
+duration_lower <- 8 # response time lower than 8 minutes
+duration_higher <- 40 # response time higher than 40 minutes
+```
+
+```{r}
+time_out_lower <- data_prolific |>
+  filter(duration > duration_lower) |>
+  nrow()
+```
+
+```{r}
+time_out_higher <- data_prolific |>
+  filter(duration < duration_higher) |>
+  nrow()
+```
+
+```{r}
+data_prolific <- data_prolific |>
+  filter(duration >= duration_lower) |>
+  filter(duration <= duration_higher)
+```
+
+### Sample Size (Wave 1)
+
+```{r}
+nrow(data_prolific)
+```
+
+
+
+
+Independent Samples T-Test for numeric variables
+
+```{r}
+
+
+numeric_variables <- c("age", "busexp", "amountfound", "compage", "amountemp", "duration")
+
+t_test_results <- lapply(numeric_variables, function(var) {
+    t.test(data_manual[[var]], data_prolific[[var]], var.equal = TRUE)
+})
+
+
+# Apply the function to each variable and create a summary table
+t_test_summaries <- sapply(t_test_results, function(test) {
+    c(round(test$estimate, 3), p.value = round(test$p.value, 3))
+})
+
+t_test_summaries
+
+```
+
+Chi-Square Test of Independence for Binary and Categorical Variables:
+
+```{r}
+
+binary_variables <- c("pubfund", "programpart", "startupcenter")
+
+chi_square_results <- lapply(binary_variables, function(var) {
+  # Combine the variables from both datasets
+  combined_var <- factor(c(data_manual[[var]], data_prolific[[var]]))
+  # Create a group factor to distinguish between datasets
+  group_factor <- factor(rep(c("manual", "prolific"), c(nrow(data_manual), nrow(data_prolific))))
+  # Perform Chi-Square test
+  chisq_test_result <- chisq.test(table(combined_var, group_factor))
+  
+  return(list(
+    chi_sq = chisq_test_result$statistic,
+    p_value = chisq_test_result$p.value,
+    expected = chisq_test_result$expected
+  ))
+})
+
+# Display results
+chi_square_results
+
+# Initialize an empty data frame for the summary
+chi_square_summary <- data.frame(
+  Variable = character(),
+  Chi_Square = numeric(),
+  P_Value = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# Loop through the results and populate the summary table
+for (i in seq_along(chi_square_results)) {
+  chi_square_summary <- rbind(chi_square_summary, 
+                              data.frame(
+                                Variable = binary_variables[i],
+                                Chi_Square = chi_square_results[[i]]$chi_sq,
+                                P_Value = chi_square_results[[i]]$p_value
+                              ))
+}
+
+# Print the summary table
+print(chi_square_summary)
+
+
+```
+
+Mann-Whitney U Test for Likert Scale Variables:
+
+```{r}
+
+likert_variables <- c("eecontlike1", "eecontlike2", "eecontlike3", "eecontlike4", "eecontlike5", "eecontlike6", "eecontlike7", "eecontlike8", "eecontlike1rep", "eecontlike2rep", "eecontlike3rep", "eecontlike4rep", "eecontlike5rep", "eecontlike6rep", "eecontlike7rep", "eecontlike8rep")
+
+# Initialize an empty data frame for the summary
+mwu_summary <- data.frame(Variable = character(), W = numeric(), P_Value = numeric(), stringsAsFactors = FALSE)
+
+# Perform Mann-Whitney U Test and populate summary table
+for (var in likert_variables) {
+  test_result <- wilcox.test(data_manual[[var]], data_prolific[[var]])
+  mwu_summary <- rbind(mwu_summary, data.frame(Variable = var, W = test_result$statistic, P_Value = test_result$p.value))
+}
+
+# Round values for readability
+mwu_summary <- mwu_summary %>%
+  mutate(W = round(W, 2), P_Value = round(P_Value, 3))
+
+# Print the summary table
+print(mwu_summary)
+
+```
