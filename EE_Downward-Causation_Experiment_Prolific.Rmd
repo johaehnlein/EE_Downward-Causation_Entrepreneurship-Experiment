@@ -1216,7 +1216,8 @@ pooled_cluster <- coeftest(pooled_model, vcov = vcovCL, cluster = ~ respondent_i
 
 # Displaying the results
 tidy(pooled_cluster) |>
-  select(term, estimate, std.error)
+  select(term, estimate, std.error, p.value) |>
+  mutate(p.value = round(p.value, digits = 4))
 
 ```
 
@@ -1309,7 +1310,21 @@ model_fit_2_table
 ```
 
 
+#### Multilevel Model (Comparison)
 
+
+```{r}
+
+# Fitting the model
+multilevel_model <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + positive_outcome_expectation + benefit_perception + self_int + oth_ori  + oth_ori*altruism_potential + self_int*benefit_perception + (1 + self_int + oth_ori | respondent_id), data = pooled_data)
+
+# Displaying the results
+tidy(multilevel_model, effects = "fixed") |> 
+  select(term, estimate, std.error, p.value) |> 
+  mutate(p.value = round(p.value, digits = 3))
+
+  
+```
 
 
 

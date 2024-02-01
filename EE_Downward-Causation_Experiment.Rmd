@@ -1204,7 +1204,7 @@ pooled_data <- data |>
 
 ```
 
-#### Pooled Regression Model
+##### Pooled Regression Model 1 (Conjoint Variables Only)
 
 ```{r}
 
@@ -1216,11 +1216,14 @@ pooled_cluster <- coeftest(pooled_model, vcov = vcovCL, cluster = ~ respondent_i
 
 # Displaying the results
 tidy(pooled_cluster) |>
-  select(term, estimate, std.error)
+  select(term, estimate, std.error, p.value) |>
+  mutate(p.value = round(p.value, digits = 4))
+
+
 
 ```
 
-#### Reporting model
+##### Reporting Pooled Regression model 1 (Conjoint Variables Only)
 
 ```{r}
 
@@ -1245,68 +1248,70 @@ model_fit_table
 ```
 
 
-#### Multilevel Model (Comparison)
+##### Multilevel Model 1 (Conjoint Variables Only)
 
 
 ```{r}
 
 # Fitting the model
-multilevel_model <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + positive_outcome_expectation + benefit_perception + (1 | respondent_id) + (1 | round_id), 
+multilevel_model_1 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + positive_outcome_expectation + benefit_perception + (1 | respondent_id), 
                          data = pooled_data)
 
 # Displaying the results
-tidy(multilevel_model, effects = "fixed") |> 
-  select(term, estimate, std.error)
+tidy(multilevel_model_1, effects = "fixed") |> 
+  select(term, estimate, std.error, p.value) |> 
+  mutate(p.value = round(p.value, digits = 3))
+
+# Calculate model performance
+model_1_perf <- performance::model_performance(multilevel_model_1)
+
+model_1_perf
+         
 ```
 
 
+#### Multilevel Model 2 (Adding Self Interest + Other Orientation)
 
-
-
-
-#### Pooled Regression Model (adding controls & moderation testing)
 
 ```{r}
 
 # Fitting the model
-pooled_model_2 <- lm(
-  eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + 
-    altruism_potential + positive_outcome_expectation + benefit_perception + 
-    age + gender + pubfund + programpart + compage + gen_trust + oth_ori + self_int + ese, 
-    data = pooled_data )
-
-# Calculating clustered standard errors at the respondent and round levels
-pooled_cluster_2 <- coeftest(pooled_model_2, vcov = vcovCL, cluster = ~ respondent_id + round_id)
+multilevel_model_2 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + positive_outcome_expectation + benefit_perception + self_int + oth_ori  + oth_ori*altruism_potential + self_int*benefit_perception + self_int*altruism_potential + oth_ori*benefit_perception + (1 + self_int + oth_ori | respondent_id), data = pooled_data)
 
 # Displaying the results
-tidy(pooled_cluster_2) |>
-  select(term, estimate, std.error)
+tidy(multilevel_model_2, effects = "fixed") |> 
+  select(term, estimate, std.error, p.value) |> 
+  mutate(p.value = round(p.value, digits = 3))
+
+
+# Display model performance
+model_2_perf <- performance::model_performance(multilevel_model_2)
+
+model_2_perf
+
+r2(multilevel_model_2 )
+
 
 ```
 
-#### Reporting model
+##### Compare models
 
 ```{r}
+install.packages("see")
+library(see)
 
-# Extracting model fit statistics
-pooled_model_2_fit <- glance(pooled_model_2)
+compare_performance(multilevel_model_1, multilevel_model_2)
 
-# Displaying the results
-pooled_model_2_fit
-
-# Creating a fit table
-model_fit_2_table <- tibble(
-  `R-Squared` = round(pooled_model_2_fit$r.squared, 2),
-  `Adjusted R-Squared` = round(pooled_model_2_fit$adj.r.squared, 2),
-  `Sigma` = round(pooled_model_2_fit$sigma, 2),
-  `F-Statistic` = round(pooled_model_2_fit$statistic, 2),
-  `p-value` = round(pooled_model_2_fit$p.value, 2),
-)
-
-# Displaying the fit table
-model_fit_2_table
+plot(compare_performance(multilevel_model_1, multilevel_model_2))
 
 ```
+
+
+
+
+
+
+
 
 
 
