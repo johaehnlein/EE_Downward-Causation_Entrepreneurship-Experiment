@@ -35,6 +35,7 @@ library(tidyverse) # Used to load all tidyverse packages
 library(lavaan) # Used to perform confirmatory factor analyses
 library(psych) # Used to calculate Cronbach's Alpha and ICC values
 library(apaTables) # Used to create correlation tables
+library(car) # used to calculate VIF
 library(lme4) # Used for multilevel modeling 
 library(lmerTest) # Used for multilevel regression adding p-values to the lme4 package
 library(lmtest) # For calculating robust standard errors
@@ -46,6 +47,7 @@ library(knitr) # Used for table creation
 library(clubSandwich) # Used for cluster robust standard errors
 library(sandwich) # Used for cluster robust standard errors
 library(flextable) # Used for table creation
+
 ```
 
 # Data
@@ -53,7 +55,7 @@ library(flextable) # Used for table creation
 ## Read Data
 
 ```{r}
-data <- read.xlsx("Data_EE Downward Causation_Conjoint_Wave3.xlsx")
+data <- read.xlsx("Data_EE Downward Causation_Conjoint_Wave5.xlsx")
 ```
 
 ## Inspect Data
@@ -80,20 +82,27 @@ data <- read.xlsx("Data_EE Downward Causation_Conjoint_Wave3.xlsx")
 * ee_affiliation = Affiliation to the EE
 * ee_relationships = Personal Relationship to EE actors
 * altruism_potential = Altruistic potential
-* positive_outcome_expectation = Expected positive outcome of the activity
+* ee_gain_perception = Perception of positive impact on the entrepreneurial ecosystem 
 * benefit_perception = Perceived benefits of the entrepreneur
 * evaluation_scenexp = Experience of the described scenario
 * evaluation_scenpract = Practicability of the described scenario
 * evaluation_studreal = Realism of the described study
 * evaluation_critund = Understandability of decision criteria
 * evaluation_fun = Fun factor of the study
-* ipfinvx = Intense Positive Feeling towards inventing (4 items)
-* ipffndx = Intense Positive Feeling towards founding (3 items)
-* ipfdev = Intense Positive Feeling towards developing (3 items)
-* esex = Entrepreneurial Self-Efficacy (4 items)
+* ipfinv1 = Intense Positive Feeling towards inventing 1
+* ipfinv2 = Intense Positive Feeling towards inventing 2
+* ipfinv3 = Intense Positive Feeling towards inventing 3
+* ipfinv4 = Intense Positive Feeling towards inventing 4
 * ic_inv = Identity Centrality inventing
+* ipffnd1 = Intense Positive Feeling towards founding 1
+* ipffnd2 = Intense Positive Feeling towards founding 2
+* ipffnd3 = Intense Positive Feeling towards founding 3
 * ic_fnd = Identity Centrality founding
+* ipfdev1 = Intense Positive Feeling towards developing 1
+* ipfdev2 = Intense Positive Feeling towards developing 2
+* ipfdev3 = Intense Positive Feeling towards developing 3
 * ic_dev = Identity Centrality developing
+* esex = Entrepreneurial Self-Efficacy (4 items)
 * ex_orx = Exchange Orientation (9 items)
 * selfintx = Self-Interest (3 items)
 * othorix = Other Orientation (3 Items)
@@ -354,7 +363,6 @@ data <- data |>
   select(-c(education)) |>
   select(-c(role)) |>
   select(-c(compact)) |>
-  select(-c(busexp)) |>
   select(-c(amountfound)) |>
   select(-c(compfound)) |>
   select(-c(compcity)) |>
@@ -421,21 +429,20 @@ data <- data |>
 
 # CFA model (V1)
 
-cfa_model_all <- "gen_trust =~ gentrust1 + gentrust2 + gentrust1 + gentrust4 + gentrust5 + gentrust6
+cfa_model_all <- "gen_trust =~ gentrust1 + gentrust2 + gentrust3 + gentrust4 + gentrust5 + gentrust6
               self_int =~ selfint1 + selfint2 + selfint3
               oth_ori =~ othori1 + othori2 + othori3
               ex_or =~ exor1 + exor2 + exor3 + exor4 + exor5 + exor6 + exor7 + exor8 + exor9
               ese =~ ese1 + ese2 + ese3 + ese4
               ipf_inv =~ ipfinv1 + ipfinv2 + ipfinv3 + ipfinv4
               ic_inv =~ icinv
-              ipf_fnd =~ ipffnd1 + ipffnd2 + ipffnd3 + ipffnd1
+              ipf_fnd =~ ipffnd1 + ipffnd2 + ipffnd3
               ic_fnd =~ icfnd
               ipf_dev =~ ipfdev1 + ipfdev2 + ipfdev3
               ic_dev =~ icdev
-              ep_inv =~ ipf_inv + ic_inv
+              ep_inv =~ ipf_inv + ic_inv 
               ep_fnd =~ ipf_fnd + ic_fnd
-              ep_dev =~ ipf_dev +   ic_dev
-              ep =~ ep_inv + ep_fnd + ep_dev"
+              ep_dev =~ ipf_dev + ic_dev"
                 
 ```
 
@@ -490,7 +497,10 @@ print(cfa_all_fit_table)
 cfa_model <- "gen_trust =~ gentrust1 + gentrust2 + gentrust3 + gentrust4 + gentrust5 + gentrust6
               self_int =~ selfint1 + selfint2 + selfint3
               oth_ori =~ othori1 + othori2 + othori3
-              ese =~ ese1 + ese2 + ese3 + ese4"
+              ese =~ ese1 + ese2 + ese3 + ese4
+              ipf_fnd =~ ipffnd1 + ipffnd2 + ipffnd3
+              ic_fnd =~ icfnd
+              ep_fnd =~ ipf_fnd + ic_fnd"
 
 ```
 
@@ -584,10 +594,10 @@ alpha_ipf_inventing_scale <- alpha(ipf_inventing_scale)
 
 # Displaying summary of Cronbach's Alpha for each scale
 
-alpha_results <- data(
+alpha_results <- data.frame(
   Scale = c("General Trust", "Self Interest", "Other Orientation", 
             "Exchange Orientation", "Self Efficacy", "IPF Founding", 
-            "IPF Developing", "IPF Inventing", "EP Founding", "EP Developing", "EP Inventing", "EP"),
+            "IPF Developing", "IPF Inventing"),
   Cronbachs_Alpha = c(alpha_general_trust_scale$total$raw_alpha,
                       alpha_self_interest_scale$total$raw_alpha,
                       alpha_other_orientation_scale$total$raw_alpha,
@@ -595,8 +605,7 @@ alpha_results <- data(
                       alpha_self_efficacy_scale$total$raw_alpha,
                       alpha_ipf_founding_scale$total$raw_alpha,
                       alpha_ipf_developing_scale$total$raw_alpha,
-                      alpha_ipf_inventing_scale$total$raw_alpha,
-                      ))
+                      alpha_ipf_inventing_scale$total$raw_alpha))
 
 # Print the summary table
 print(alpha_results)
@@ -619,15 +628,11 @@ data <- data |>
   mutate(ex_or = mean(c(exor1, exor2, exor3, exor4, exor5, exor6, exor7, exor8, exor9))) |>
   mutate(ese = mean(c(ese1, ese2, ese3, ese4))) |>
   mutate(ipf_inv = mean(c(ipfinv1, ipfinv2, ipfinv3, ipfinv4))) |>
-  mutate(ic_inv = mean(c(icinv))) |>
   mutate(ipf_dev = mean(c(ipfdev1, ipfdev2, ipfdev3))) |>
-  mutate(ic_dev = mean(c(icdev))) |>
   mutate(ipf_fnd = mean(c(ipffnd1, ipffnd2, ipffnd3))) |>
-  mutate(ic_fnd = mean(c(icfnd))) |>
-  mutate(ep_inv = mean(c(ipf_inv, ic_inv))) |>
-  mutate(ep_fnd = mean(c(ipf_fnd, ic_fnd))) |>
-  mutate(ep_dev = mean(c(ipf_dev, ic_dev))) |>
-  mutate(ep = mean(c(ep_inv, ep_fnd, ep_dev))) |>
+  mutate(ep_inv = mean(c(ipf_inv, icinv))) |>
+  mutate(ep_dev = mean(c(ipf_dev, icdev))) |>
+  mutate(ep_fnd = mean(c(ipf_fnd, icfnd))) |>
   ungroup()
   
 ```
@@ -658,12 +663,6 @@ data <- data |>
 
 
 
-
-
-
-
-
-
 # Conjoint experiment
 
 ## Fractional Factorial Design 
@@ -675,7 +674,7 @@ Here, we provide you with the factorial design of this conjoint study: Subsequen
     **ee_affiliation = Affiliation to the EE
     **ee_relationships = Personal Relationship to EE actors
     **altruism_potential = Altruistic potential
-    **positive_outcome_expectation = Expected positive outcome of the activity
+    **ee_gain_perception = Expected positive impact on entrepreneurial ecosystem
     **benefit_perception = Perceived benefits of the entrepreneur
   * 2 levels per attribute (0 = low; 1 = high)
   * Fractional design with main-effects only  -> 8 profiles
@@ -691,7 +690,7 @@ profiles <- tibble(
   ee_affiliation = c(0, 1, 1, 0, 1, 0, 0, 1),
   ee_relationships = c(0, 1, 0, 0, 0, 1, 1, 1),
   altruism_potential = c(0, 0, 1, 1, 0, 0, 1, 1),
-  positive_outcome_expectation = c(0, 0, 0, 1, 1, 1, 0, 1),
+  ee_gain_perception = c(0, 0, 0, 1, 1, 1, 0, 1),
   benefit_perception = c(1, 1, 0, 1, 0, 0, 0, 1)
 )
 ```
@@ -712,10 +711,10 @@ profiles <- tibble(
 ```{r}
 
 first_round_data <- data |>
-  select(1:15, 24:26, 28) # Selecting data from first collection round
+  select(1:16, 25:35) # Selecting data from first collection round
 
 first_round_data <- first_round_data |>
-  pivot_longer(!c(1:7, 16:19), # pivoting the data set to a long format
+  pivot_longer(!c(1:8, 17:27), # pivoting the data set to a long format
     names_to = "profile", # bringing profile numbers to profile column
     values_to = "eecontlike") |> # bringing eecontlike values to eecontlike column
   mutate(profile = as.numeric(str_extract(profile, "\\-*\\d+\\.*\\d*"))) |> # saving numeric values of profile numbers into the profile column
@@ -740,10 +739,10 @@ first_round_data <- first_round_data |>
 ```{r}
 
 second_round_data <- data |>
-  select(1:7, 16:23, 24:26, 28) # Selecting data from second collection round
+  select(1:8, 17:35) # Selecting data from second collection round
 
 second_round_data <- second_round_data |>
-  pivot_longer(!c(1:7, 16:19), # pivoting the data set to a long format
+  pivot_longer(!c(1:8, 17:27), # pivoting the data set to a long format
     names_to = "profile", # bringing profile numbers to profile column
     values_to = "eecontlike") |> # bringing eecontlike values to eecontlike column
   mutate(profile = as.numeric(str_extract(profile, "\\-*\\d+\\.*\\d*"))) |> # saving numeric values of profile numbers into the profile column
@@ -762,7 +761,7 @@ data <- rbind(first_round_data, second_round_data)
 
 ```{r}
 data <- left_join(data, profiles, by = "profile") |> 
-  relocate("ee_support_reception", "ee_affiliation", "ee_relationships", "altruism_potential", "positive_outcome_expectation", "benefit_perception", .after = "profile") #relocating attributes in the data set
+  relocate("ee_support_reception", "ee_affiliation", "ee_relationships", "altruism_potential", "ee_gain_perception", "benefit_perception", .after = "profile") #relocating attributes in the data set
 
 ```
 
@@ -780,7 +779,7 @@ data <- data |>
 
 ## Correlation Table
 
-The correlation table of the model includes the dependent variable, controls as well as significant factors from the CFA. These are:
+The correlation table of the model includes the dependent variable, controls and variable composites. These are:
 
   *eecontlike
   *age
@@ -793,13 +792,14 @@ The correlation table of the model includes the dependent variable, controls as 
   *self_int
   *oth_ori
   *ese
+  *
  
 
 
 ```{r}
 
 data |>
-  select(eecontlike, age, gender, compage, pubfund, programpart, gen_trust, self_int, oth_ori, ese) |> #selecting variables
+  select(eecontlike, age, gender, compage, busexp, pubfund, programpart, gen_trust, self_int, oth_ori, ese, ep_inv, ep_dev, ep_fnd) |> #selecting variables
   apa.cor.table() #creation of correlation matrix
 
 ```
@@ -815,7 +815,7 @@ As already explained earlier, our conjoint experiment included the following the
     **ee_affiliation = Affiliation to the EE
     **ee_relationships = Personal Relationship to EE actors
     **altruism_potential = Altruistic potential
-    **positive_outcome_expectation = Expected positive outcome of the activity
+    **ee_gain_perception = Expected positive impact on the entrepreneurial ecosystem
     **benefit_perception = Perceived benefits of the entrepreneur
 
 Due to the nature of conjoint studies with complex and theoretically derived scenarios, the potential uncertainity, ambiguity and eventually careless responses is high (Lohrke, 2010). In order to test response consistency, we replicated all 8 profiles of our fractional factorial design (Shepherd & Zacharakis, 2018). Using the data sets from both data collection rounds, we can test the stability of responses applying test-retest reliability assesment.
@@ -1097,7 +1097,7 @@ first_round_data <- data |>
 
 ```{r}
 # Fitting the model
-first_round_model <- lm(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + positive_outcome_expectation + benefit_perception, data = first_round_data)
+first_round_model <- lm(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception, data = first_round_data)
 
 # Calculating clustered standard errors
 first_round_cluster <- coeftest(first_round_model, vcov = vcovCL, cluster = ~ respondent_id)
@@ -1132,7 +1132,7 @@ second_round_data <- data %>%
 ```{r}
 
 # Fitting the model
-second_round_model <- lm(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + positive_outcome_expectation + benefit_perception, data = second_round_data)
+second_round_model <- lm(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception, data = second_round_data)
 
 # Calculating clustered standard errors
 second_round_cluster <- coeftest(second_round_model, vcov = vcovCL, cluster = ~ respondent_id)
@@ -1209,7 +1209,7 @@ pooled_data <- data |>
 ```{r}
 
 # Fitting the model
-pooled_model <- lm(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + positive_outcome_expectation + benefit_perception, data = pooled_data)
+pooled_model <- lm(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + gender + compage + pubfund + startupcenter + programpart + gen_trust + self_int + oth_ori + ep_fnd, data = pooled_data)
 
 # Calculating clustered standard errors at the respondent and round levels
 pooled_cluster <- coeftest(pooled_model, vcov = vcovCL, cluster = ~ respondent_id + round_id)
@@ -1219,7 +1219,13 @@ tidy(pooled_cluster) |>
   select(term, estimate, std.error, p.value) |>
   mutate(p.value = round(p.value, digits = 4))
 
+# Calculating and displaying Variance inflation factors
 
+vif_values_pooled_model <- vif(pooled_model)
+
+vif_dataframe_pooled_model <- data.frame(Variable = names(vif_values_pooled_model), VIF = vif_values_pooled_model)
+
+print(vif_dataframe_pooled_model)
 
 ```
 
@@ -1254,8 +1260,7 @@ model_fit_table
 ```{r}
 
 # Fitting the model
-multilevel_model_1 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + positive_outcome_expectation + benefit_perception + (1 | respondent_id), 
-                         data = pooled_data)
+multilevel_model_1 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + (1 | respondent_id),   data = pooled_data)
 
 # Displaying the results
 tidy(multilevel_model_1, effects = "fixed") |> 
@@ -1270,13 +1275,13 @@ model_1_perf
 ```
 
 
-#### Multilevel Model 2 (Adding Self Interest + Other Orientation)
+#### Multilevel Model 2 (Adding controls)
 
 
 ```{r}
 
 # Fitting the model
-multilevel_model_2 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + positive_outcome_expectation + benefit_perception + self_int + oth_ori  + oth_ori*altruism_potential + self_int*benefit_perception + self_int*altruism_potential + oth_ori*benefit_perception + (1 + self_int + oth_ori | respondent_id), data = pooled_data)
+multilevel_model_2 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + gender + compage + oth_ori + self_int + ep_fnd + (1 | respondent_id), data = pooled_data)
 
 # Displaying the results
 tidy(multilevel_model_2, effects = "fixed") |> 
@@ -1289,10 +1294,107 @@ model_2_perf <- performance::model_performance(multilevel_model_2)
 
 model_2_perf
 
-r2(multilevel_model_2 )
+
+```
+
+
+#### Multilevel Model 3 (Adding Interactions)
+
+
+```{r}
+
+# Fitting the model
+multilevel_model_3 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + oth_ori*altruism_potential + self_int*benefit_perception + (1 | respondent_id), data = pooled_data)
+
+# Displaying the results
+tidy(multilevel_model_3, effects = "fixed") |> 
+  select(term, estimate, std.error, p.value) |> 
+  mutate(p.value = round(p.value, digits = 3))
+
+
+# Display model performance
+model_3_perf <- performance::model_performance(multilevel_model_3)
+
+model_3_perf
+
+r2(multilevel_model_3)
+
+```
+
+#### Multilevel Model 4 (Adding Interactions)
+
+
+```{r}
+
+# Fitting the model
+multilevel_model_4 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + ep_fnd*ee_affiliation + (1 | respondent_id), data = pooled_data)
+
+# Displaying the results
+tidy(multilevel_model_4, effects = "fixed") |> 
+  select(term, estimate, std.error, p.value) |> 
+  mutate(p.value = round(p.value, digits = 3))
+
+
+# Display model performance
+model_4_perf <- performance::model_performance(multilevel_model_4)
+
+model_4_perf
+
+r2(multilevel_model_4)
+
+```
+
+
+#### Multilevel Model 5 (Adding Interactions)
+
+
+```{r}
+
+# Fitting the model
+multilevel_model_5 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + gen_trust*benefit_perception  + (1 | respondent_id), data = pooled_data)
+
+# Displaying the results
+tidy(multilevel_model_5, effects = "fixed") |> 
+  select(term, estimate, std.error, p.value) |> 
+  mutate(p.value = round(p.value, digits = 3))
+
+
+# Display model performance
+model_5_perf <- performance::model_performance(multilevel_model_5)
+
+model_5_perf
+
+r2(multilevel_model_5)
+
+```
+
+##### Multilevel Model 6 (Adding Interactions)
+
+
+```{r}
+
+# Fitting the model
+multilevel_model_6 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + oth_ori*altruism_potential + self_int*benefit_perception + ep_fnd*ee_affiliation + (1 | respondent_id), data = pooled_data)
+
+# Displaying the results
+tidy(multilevel_model_6, effects = "fixed") |> 
+  select(term, estimate, std.error, p.value) |> 
+  mutate(p.value = round(p.value, digits = 3))
+
+
+# Display model performance
+model_6_perf <- performance::model_performance(multilevel_model_6)
+
+model_6_perf
+
+r2(multilevel_model_6)
+
+# Exploring the interactions (Plotting the interactions)
 
 
 ```
+
+
 
 ##### Compare models
 
@@ -1300,9 +1402,9 @@ r2(multilevel_model_2 )
 install.packages("see")
 library(see)
 
-compare_performance(multilevel_model_1, multilevel_model_2)
+compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3,multilevel_model_4,multilevel_model_5, multilevel_model_6)
 
-plot(compare_performance(multilevel_model_1, multilevel_model_2))
+plot(compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3,multilevel_model_4,multilevel_model_5, multilevel_model_6))
 
 ```
 
