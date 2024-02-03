@@ -47,6 +47,7 @@ library(knitr) # Used for table creation
 library(clubSandwich) # Used for cluster robust standard errors
 library(sandwich) # Used for cluster robust standard errors
 library(flextable) # Used for table creation
+library(see) # used to analyze and compare the performance of multi-level models
 
 ```
 
@@ -494,10 +495,8 @@ print(cfa_all_fit_table)
 
 # CFA model (v2)
 
-cfa_model <- "gen_trust =~ gentrust1 + gentrust2 + gentrust3 + gentrust4 + gentrust5 + gentrust6
-              self_int =~ selfint1 + selfint2 + selfint3
+cfa_model <- "self_int =~ selfint1 + selfint2 + selfint3
               oth_ori =~ othori1 + othori2 + othori3
-              ese =~ ese1 + ese2 + ese3 + ese4
               ipf_fnd =~ ipffnd1 + ipffnd2 + ipffnd3
               ic_fnd =~ icfnd
               ep_fnd =~ ipf_fnd + ic_fnd"
@@ -622,10 +621,10 @@ print(alpha_results)
 ```{r}
 data <- data |>
   rowwise() |>
-  mutate(gen_trust = mean(c(gentrust1, gentrust2, gentrust3, gentrust4, gentrust5, gentrust6))) |>
+  mutate(gen_trust = mean(c(gentrust1, gentrust2, gentrust3, gentrust4, gentrust6))) |>
   mutate(self_int = mean(c(selfint1, selfint2, selfint3))) |>
   mutate(oth_ori = mean(c(othori1, othori2, othori3))) |>
-  mutate(ex_or = mean(c(exor1, exor2, exor3, exor4, exor5, exor6, exor7, exor8, exor9))) |>
+  mutate(ex_or = mean(c(exor1, exor2, exor6, exor7, exor8))) |>
   mutate(ese = mean(c(ese1, ese2, ese3, ese4))) |>
   mutate(ipf_inv = mean(c(ipfinv1, ipfinv2, ipfinv3, ipfinv4))) |>
   mutate(ipf_dev = mean(c(ipfdev1, ipfdev2, ipfdev3))) |>
@@ -792,7 +791,6 @@ The correlation table of the model includes the dependent variable, controls and
   *self_int
   *oth_ori
   *ese
-  *
  
 
 
@@ -1281,7 +1279,7 @@ model_1_perf
 ```{r}
 
 # Fitting the model
-multilevel_model_2 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + gender + compage + oth_ori + self_int + ep_fnd + (1 | respondent_id), data = pooled_data)
+multilevel_model_2 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + gender + compage + oth_ori + self_int + ep_fnd + ex_or + gen_trust + (1 | respondent_id), data = pooled_data)
 
 # Displaying the results
 tidy(multilevel_model_2, effects = "fixed") |> 
@@ -1298,13 +1296,13 @@ model_2_perf
 ```
 
 
-#### Multilevel Model 3 (Adding Interactions)
+#### Multilevel Model 3 (Adding Interactions - Other Orientation & Self-Interest)
 
 
 ```{r}
 
 # Fitting the model
-multilevel_model_3 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + oth_ori*altruism_potential + self_int*benefit_perception + (1 | respondent_id), data = pooled_data)
+multilevel_model_3 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + oth_ori*altruism_potential + self_int*benefit_perception + (1 | respondent_id), data = pooled_data)
 
 # Displaying the results
 tidy(multilevel_model_3, effects = "fixed") |> 
@@ -1321,13 +1319,13 @@ r2(multilevel_model_3)
 
 ```
 
-#### Multilevel Model 4 (Adding Interactions)
+#### Multilevel Model 4 (Adding Interactions - Entrepreneurial Passion)
 
 
 ```{r}
 
 # Fitting the model
-multilevel_model_4 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + ep_fnd*ee_affiliation + (1 | respondent_id), data = pooled_data)
+multilevel_model_4 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + ep_fnd*ee_gain_perception + (1 | respondent_id), data = pooled_data)
 
 # Displaying the results
 tidy(multilevel_model_4, effects = "fixed") |> 
@@ -1345,13 +1343,13 @@ r2(multilevel_model_4)
 ```
 
 
-#### Multilevel Model 5 (Adding Interactions)
+#### Multilevel Model 5 (General Trust)
 
 
 ```{r}
 
 # Fitting the model
-multilevel_model_5 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + gen_trust*benefit_perception  + (1 | respondent_id), data = pooled_data)
+multilevel_model_5 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + gen_trust*altruism_potential  + (1 | respondent_id), data = pooled_data)
 
 # Displaying the results
 tidy(multilevel_model_5, effects = "fixed") |> 
@@ -1368,13 +1366,14 @@ r2(multilevel_model_5)
 
 ```
 
-##### Multilevel Model 6 (Adding Interactions)
+
+##### Multilevel Model 6 (Adding Interactions - Exchange Orientation)
 
 
 ```{r}
 
 # Fitting the model
-multilevel_model_6 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + oth_ori*altruism_potential + self_int*benefit_perception + ep_fnd*ee_affiliation + (1 | respondent_id), data = pooled_data)
+multilevel_model_6 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + ex_or*ee_relationships + (1 | respondent_id), data = pooled_data)
 
 # Displaying the results
 tidy(multilevel_model_6, effects = "fixed") |> 
@@ -1394,19 +1393,123 @@ r2(multilevel_model_6)
 
 ```
 
+##### Multilevel Model 7 (Adding Interactions - Entrepreneurial Self-Efficacy)
+
+
+```{r}
+
+# Fitting the model
+multilevel_model_7 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + ese*benefit_perception + (1 | respondent_id), data = pooled_data)
+
+# Displaying the results
+tidy(multilevel_model_7, effects = "fixed") |> 
+  select(term, estimate, std.error, p.value) |> 
+  mutate(p.value = round(p.value, digits = 3))
+
+
+# Display model performance
+model_7_perf <- performance::model_performance(multilevel_model_7)
+
+model_7_perf
+
+r2(multilevel_model_7)
+
+# Exploring the interactions (Plotting the interactions)
+
+
+```
+
+
+##### Multilevel Model 8 (Adding Interactions - Target Model 1)
+
+
+```{r}
+
+# Fitting the model
+multilevel_model_8 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + oth_ori*altruism_potential + self_int*benefit_perception + ep_fnd*ee_affiliation + (1 | respondent_id), data = pooled_data)
+
+# Displaying the results
+tidy(multilevel_model_8, effects = "fixed") |> 
+  select(term, estimate, std.error, p.value) |> 
+  mutate(p.value = round(p.value, digits = 3))
+
+
+# Display model performance
+model_8_perf <- performance::model_performance(multilevel_model_8)
+
+model_8_perf
+
+r2(multilevel_model_8)
+
+# Exploring the interactions (Plotting the interactions)
+
+
+```
+
+##### Multilevel Model 9 (Adding Interactions - Target Model 2)
+
+
+```{r}
+
+# Fitting the model
+multilevel_model_9 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + oth_ori*altruism_potential + self_int*benefit_perception + ep_fnd*ee_affiliation + + ex_or*ee_relationships + (1 | respondent_id), data = pooled_data)
+
+# Displaying the results
+tidy(multilevel_model_9, effects = "fixed") |> 
+  select(term, estimate, std.error, p.value) |> 
+  mutate(p.value = round(p.value, digits = 3))
+
+
+# Display model performance
+model_9_perf <- performance::model_performance(multilevel_model_9)
+
+model_9_perf
+
+r2(multilevel_model_9)
+
+# Exploring the interactions (Plotting the interactions)
+
+
+```
 
 
 ##### Compare models
 
 ```{r}
-install.packages("see")
-library(see)
 
-compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3,multilevel_model_4,multilevel_model_5, multilevel_model_6)
+compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3,multilevel_model_4,multilevel_model_5, multilevel_model_6, multilevel_model_7, multilevel_model_8, multilevel_model_9)
 
-plot(compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3,multilevel_model_4,multilevel_model_5, multilevel_model_6))
+plot(compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3,multilevel_model_4,multilevel_model_5, multilevel_model_6, multilevel_model_7, multilevel_model_8, multilevel_model_8, multilevel_model_9))
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -1,12 +1,10 @@
-<<<<<<< HEAD
 ---
-title: "EE_Downward-Causation_Prolific"
+title: "EE_Downward-Causation_Experiment_Merged"
 author: "Johannes Haehnlein"
 date: "`r Sys.Date()`"
 output: html_document
 theme: flatly
 ---
-
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -57,7 +55,7 @@ library(see) # used to analyze and compare the performance of multi-level models
 ## Read Data
 
 ```{r}
-data <- read.xlsx("Data_EE Downward Causation_Conjoint_Prolific_Clean.xlsx")
+data <- read.xlsx("Data_EE Downward Causation_Conjoint_Merged.xlsx")
 ```
 
 ## Inspect Data
@@ -1483,24 +1481,6 @@ compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3,m
 plot(compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3,multilevel_model_4,multilevel_model_5, multilevel_model_6, multilevel_model_7, multilevel_model_8, multilevel_model_8, multilevel_model_9))
 
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
