@@ -57,7 +57,7 @@ library(see) # used to analyze and compare the performance of multi-level models
 ## Read Data
 
 ```{r}
-data <- read.xlsx("Data_EE Downward Causation_Conjoint_Prolific_Clean.xlsx")
+data <- read.xlsx("Data_EE Downward Causation_Conjoint_Prolific.xlsx")
 ```
 
 ## Inspect Data

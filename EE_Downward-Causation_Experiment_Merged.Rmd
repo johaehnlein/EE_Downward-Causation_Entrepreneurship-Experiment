@@ -76,7 +76,7 @@ data <- read.xlsx("Data_EE Downward Causation_Conjoint_Merged.xlsx")
 * pubfund1 = public funding by a funding program in germany
 * programpart = Participation in an accleration or incubation program
 * startupcenter = Being in located in a startup or technology center
-* eecontlik = Conjoint Card 1-8 (Assessment of likelihood to engage in the EE contribution behavior)
+* eecontlike = Conjoint Card 1-8 (Assessment of likelihood to engage in the EE contribution behavior)
 * eecontlikrep = Replication Conjoint Card 1-8 (Assessment of likelihood to engage in the EE contribution behavior)
 * ee_support_reception = Perceived EE support
 * ee_affiliation = Affiliation to the EE
@@ -1318,6 +1318,29 @@ r2(multilevel_model_3)
 
 ```
 
+#### Multilevel Model 3.1 (Adding Interactions - Other Orientation & Self-Interest + Random SLopes)
+
+
+```{r}
+
+# Fitting the model
+multilevel_model_3.1 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + oth_ori:altruism_potential + self_int:benefit_perception + (1 + oth_ori + self_int | respondent_id), data = pooled_data)
+
+# Displaying the results
+tidy(multilevel_model_3.1, effects = "fixed") |> 
+  select(term, estimate, std.error, p.value) |> 
+  mutate(p.value = round(p.value, digits = 3))
+
+
+# Display model performance
+model_3.1_perf <- performance::model_performance(multilevel_model_3.1)
+
+model_3.1_perf
+
+r2(multilevel_model_3.1)
+
+```
+
 #### Multilevel Model 4 (Adding Interactions - Entrepreneurial Passion)
 
 
@@ -1445,6 +1468,34 @@ r2(multilevel_model_8)
 
 ```
 
+#### Multilevel Model 8.1 (Adding Random SLopes - Target Model 1.1)
+
+
+```{r}
+
+# Fitting the model
+multilevel_model_8.1 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + oth_ori:altruism_potential + self_int:benefit_perception + ep_fnd*ee_affiliation + (1 + oth_ori + self_int | respondent_id), data = pooled_data)
+
+# Displaying the results
+tidy(multilevel_model_8.1, effects = "fixed") |> 
+  select(term, estimate, std.error, p.value) |> 
+  mutate(p.value = round(p.value, digits = 3))
+
+
+# Display model performance
+model_8.1_perf <- performance::model_performance(multilevel_model_8.1)
+
+model_8.1_perf
+
+r2(multilevel_model_8.1)
+
+# Exploring the interactions (Plotting the interactions)
+
+
+```
+
+
+
 ##### Multilevel Model 9 (Adding Interactions - Target Model 2)
 
 
@@ -1476,9 +1527,9 @@ r2(multilevel_model_9)
 
 ```{r}
 
-compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3,multilevel_model_4,multilevel_model_5, multilevel_model_6, multilevel_model_7, multilevel_model_8, multilevel_model_9)
+compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3, multilevel_model_3.1, multilevel_model_4,multilevel_model_5, multilevel_model_6, multilevel_model_7, multilevel_model_8, multilevel_model_8, multilevel_model_8.1, multilevel_model_9)
 
-plot(compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3,multilevel_model_4,multilevel_model_5, multilevel_model_6, multilevel_model_7, multilevel_model_8, multilevel_model_8, multilevel_model_9))
+plot(compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3, multilevel_model_3.1, multilevel_model_4,multilevel_model_5, multilevel_model_6, multilevel_model_7, multilevel_model_8, multilevel_model_8, multilevel_model_8.1, multilevel_model_9))
 
 ```
 

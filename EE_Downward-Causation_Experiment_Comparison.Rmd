@@ -33,7 +33,7 @@ library(flextable) # Used for table creation
 ## Read Data
 
 ```{r}
-data_manual <- read.xlsx("Data_EE Downward Causation_Conjoint_Wave2.xlsx")
+data_manual <- read.xlsx("Data_EE Downward Causation_Conjoint_Wave5.xlsx")
 ```
 
 ## Inspect Data
@@ -283,7 +283,7 @@ Independent Samples T-Test for numeric variables
 ```{r}
 
 
-numeric_variables <- c("age", "busexp", "amountfound", "compage", "amountemp", "duration")
+numeric_variables <- c("age", "busexp", "compage", "amountemp")
 
 t_test_results <- lapply(numeric_variables, function(var) {
     t.test(data_manual[[var]], data_prolific[[var]], var.equal = TRUE)
@@ -303,7 +303,7 @@ Chi-Square Test of Independence for Binary and Categorical Variables:
 
 ```{r}
 
-binary_variables <- c("pubfund", "programpart", "startupcenter")
+binary_variables <- c("gender", "pubfund", "programpart", "startupcenter")
 
 chi_square_results <- lapply(binary_variables, function(var) {
   # Combine the variables from both datasets
