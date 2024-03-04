@@ -1,0 +1,75 @@
+---
+title: "EE_Downward-Causation_Experiment_Non-reponse bias"
+author: "Johannes Haehnlein"
+date: "`r Sys.Date()`"
+output: html_document
+theme: flatly
+---
+
+# In this R markdown, we test, if there is a non-response bias in our collected data for the conjoint experiment about downward causation in entrepreneurial ecosystems. 
+
+# Libraries
+
+```{r}
+library(openxlsx) # Used to import and export excel files
+library(tidyverse) # Used to load all tidyverse packages
+library(lavaan) # Used to perform confirmatory factor analyses
+library(psych) # Used to calculate Cronbach's Alpha and ICC values
+library(apaTables) # Used to create correlation tables
+library(lme4) # Used for multilevel modeling 
+library(lmerTest) # Used for multilevel regression adding p-values to the lme4 package
+library(lmtest) # For calculating robust standard errors
+library(broom) # Used to create tidy data frames with model results
+library(broom.mixed) # Used to tidy result objects for multilevel modeling
+library(parameters) # Used to augement regression analyses
+library(performance) # Used to  obtain R2 for multilevel models
+library(knitr) # Used for table creation
+library(clubSandwich) # Used for cluster robust standard errors
+library(sandwich) # Used for cluster robust standard errors
+library(flextable) # Used for table creation
+```
+
+# Data
+
+## Read Data
+
+```{r}
+data_sample <- read.xlsx("Non_response_bias_sample.xlsx")
+data_non_respondents <- read.xlsx("Non_response_bias_non_respondents.xlsx")
+```
+
+
+```{r}
+
+# T-Test for age
+t.test(data_sample$age, data_non_respondents$age)
+
+# T-Test for business experience of the entrepreneurs
+
+t_test_busexp <- t.test(data_sample$busexp, data_non_respondents$busexp)
+cat("T-Test for Business Experience:\n", "t =", t_test_busexp$statistic, "\n", "df =", t_test_busexp$parameter, "\n", "p-value =", format.pval(t_test_busexp$p.value, digits = 3), "\n\n")
+
+
+# T-Test for age of the entrepreneurs' startup
+t.test(data_sample$compage, data_non_respondents$compage) 
+
+# Kolmogorov-Smirnov Test for age
+ks.test(data_sample$age, data_non_respondents$age) 
+
+# Kolmogorov-Smirnov Test for business experience of the entrepreneurs
+ks.test(data_sample$busexp, data_non_respondents$busexp)
+
+# Kolmogorov-Smirnov Test for age of the entrepreneurs' startup
+ks.test(data_sample$compage, data_non_respondents$compage)
+
+# Chi-square test for the categorical variable gender
+## Contingency table
+gender_table <- table(data_sample$gender, data_non_respondents$gender)
+
+## Chi-square test
+chisq.test(gender_table)
+
+```
+
+
+

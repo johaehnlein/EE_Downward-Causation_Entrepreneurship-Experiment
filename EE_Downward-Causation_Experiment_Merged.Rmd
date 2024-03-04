@@ -1463,9 +1463,6 @@ model_8_perf
 
 r2(multilevel_model_8)
 
-# Exploring the interactions (Plotting the interactions)
-
-
 ```
 
 #### Multilevel Model 8.1 (Adding Random SLopes - Target Model 1.1)
@@ -1474,7 +1471,7 @@ r2(multilevel_model_8)
 ```{r}
 
 # Fitting the model
-multilevel_model_8.1 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + oth_ori:altruism_potential + self_int:benefit_perception + ep_fnd*ee_affiliation + (1 + oth_ori + self_int | respondent_id), data = pooled_data)
+multilevel_model_8.1 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + oth_ori*altruism_potential + self_int*benefit_perception +  (1 + oth_ori + self_int | respondent_id), data = pooled_data)
 
 # Displaying the results
 tidy(multilevel_model_8.1, effects = "fixed") |> 
@@ -1489,47 +1486,165 @@ model_8.1_perf
 
 r2(multilevel_model_8.1)
 
-# Exploring the interactions (Plotting the interactions)
+# Standardizing continuous predictors
+
+pooled_data$ee_support_reception_std <- scale(pooled_data$ee_support_reception, center = TRUE, scale = TRUE)
+pooled_data$ee_affiliation_std <- scale(pooled_data$ee_affiliation, center = TRUE, scale = TRUE)
+pooled_data$ee_relationships_std <- scale(pooled_data$ee_relationships, center = TRUE, scale = TRUE)
+pooled_data$altruism_potential_std <- scale(pooled_data$altruism_potential, center = TRUE, scale = TRUE)
+pooled_data$ee_gain_perception_std <- scale(pooled_data$ee_gain_perception, center = TRUE, scale = TRUE)
+pooled_data$benefit_perception_std <- scale(pooled_data$benefit_perception, center = TRUE, scale = TRUE)
+pooled_data$oth_ori_std <- scale(pooled_data$oth_ori, center = TRUE, scale = TRUE)
+pooled_data$self_int_std <- scale(pooled_data$self_int, center = TRUE, scale = TRUE)
+pooled_data$age_std <- scale(pooled_data$age, center = TRUE, scale = TRUE)
+pooled_data$compage_std <- scale(pooled_data$compage, center = TRUE, scale = TRUE)
+
+# Creating standardized interaction terms
+pooled_data$oth_ori_altruism_potential_std <- pooled_data$oth_ori_std * pooled_data$altruism_potential_std
+pooled_data$self_int_benefit_perception_std <- pooled_data$self_int_std * pooled_data$benefit_perception_std
+
+# Re-fitting the model with standardized predictors
+multilevel_model_8.1_std <- lmer(eecontlike ~ ee_support_reception_std + ee_affiliation_std + ee_relationships_std + altruism_potential_std + ee_gain_perception_std + benefit_perception_std + age_std + compage_std + gender + oth_ori_std*altruism_potential_std + self_int_std*benefit_perception_std + (1 + oth_ori_std + self_int_std | respondent_id), data = pooled_data)
+
+
+# Displaying the results
+tidy(multilevel_model_8.1_std, effects = "fixed") |> 
+  select(term, estimate, std.error, p.value) |> 
+  mutate(p.value = round(p.value, digits = 3))
+
+# Display model performance
+multilevel_model_8.1_std_perf <- performance::model_performance(multilevel_model_8.1_std)
+
+multilevel_model_8.1_std_perf
+
+r2(multilevel_model_8.1_std)
 
 
 ```
 
-
-
-##### Multilevel Model 9 (Adding Interactions - Target Model 2)
+#### Multilevel Model 8.2 (Adding Random SLopes - Target Model 1.2)
 
 
 ```{r}
 
 # Fitting the model
-multilevel_model_9 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + oth_ori*altruism_potential + self_int*benefit_perception + ep_fnd*ee_affiliation + + ex_or*ee_relationships + (1 | respondent_id), data = pooled_data)
+multilevel_model_8.2 <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + oth_ori*altruism_potential + self_int*benefit_perception + (1 + oth_ori + self_int | respondent_id), data = pooled_data)
 
 # Displaying the results
-tidy(multilevel_model_9, effects = "fixed") |> 
+tidy(multilevel_model_8.2, effects = "fixed") |> 
   select(term, estimate, std.error, p.value) |> 
   mutate(p.value = round(p.value, digits = 3))
 
 
 # Display model performance
-model_9_perf <- performance::model_performance(multilevel_model_9)
+model_8.2_perf <- performance::model_performance(multilevel_model_8.2)
 
-model_9_perf
+model_8.2_perf
 
-r2(multilevel_model_9)
+r2(multilevel_model_8.2)
 
-# Exploring the interactions (Plotting the interactions)
+
+# Standardizing continuous predictors
+
+pooled_data$ee_support_reception_std <- scale(pooled_data$ee_support_reception, center = TRUE, scale = TRUE)
+pooled_data$ee_affiliation_std <- scale(pooled_data$ee_affiliation, center = TRUE, scale = TRUE)
+pooled_data$ee_relationships_std <- scale(pooled_data$ee_relationships, center = TRUE, scale = TRUE)
+pooled_data$altruism_potential_std <- scale(pooled_data$altruism_potential, center = TRUE, scale = TRUE)
+pooled_data$ee_gain_perception_std <- scale(pooled_data$ee_gain_perception, center = TRUE, scale = TRUE)
+pooled_data$benefit_perception_std <- scale(pooled_data$benefit_perception, center = TRUE, scale = TRUE)
+pooled_data$oth_ori_std <- scale(pooled_data$oth_ori, center = TRUE, scale = TRUE)
+pooled_data$self_int_std <- scale(pooled_data$self_int, center = TRUE, scale = TRUE)
+pooled_data$age_std <- scale(pooled_data$age, center = TRUE, scale = TRUE)
+pooled_data$compage_std <- scale(pooled_data$compage, center = TRUE, scale = TRUE)
+
+# Creating standardized interaction terms
+pooled_data$oth_ori_altruism_potential_std <- pooled_data$oth_ori_std * pooled_data$altruism_potential_std
+pooled_data$self_int_benefit_perception_std <- pooled_data$self_int_std * pooled_data$benefit_perception_std
+
+# Re-fitting the model with standardized predictors
+multilevel_model_8.2_std <- lmer(eecontlike ~ ee_support_reception_std + ee_affiliation_std + ee_relationships_std + altruism_potential_std + ee_gain_perception_std + benefit_perception_std + age_std + compage_std + gender + oth_ori_std*altruism_potential_std + self_int_std*benefit_perception_std + (1 + oth_ori_std + self_int_std | respondent_id), data = pooled_data)
+
+
+# Displaying the results
+tidy(multilevel_model_8.2_std, effects = "fixed") |> 
+  select(term, estimate, std.error, p.value) |> 
+  mutate(p.value = round(p.value, digits = 3))
+
+# Display model performance
+multilevel_model_8.2_std_perf <- performance::model_performance(multilevel_model_8.2_std)
+
+multilevel_model_8.2_std_perf
+
+r2(multilevel_model_8.2_std)
+
+# Extracting results from non-standardized model
+results_nonstd_8.2 <- tidy(multilevel_model_8.2, effects = "fixed") |>
+  select(term, estimate = estimate, std.error, p.value) |>
+  mutate(term = as.character(term),
+         p.value = round(p.value, digits = 3))
+
+# Extracting results from standardized model for standardized estimates (β)
+results_std_8.2 <- tidy(multilevel_model_8.2_std, effects = "fixed") |>
+  select(term, std_estimate = estimate) |>
+  mutate(term = as.character(term))
+
+# Merging the non-standardized and standardized results
+
+consolidated_results_8.2 <- results_nonstd_8.2 |>
+  mutate(standardized_estimate = results_std_8.2$std_estimate)
+
+
+# Preparing final data frame for table generation
+# standardized estimates (β) are to be presented alongside B in parenthesis
+model_results_for_table_8.2 <- consolidated_results_8.2 |>
+  mutate(B_with_β = paste(round(estimate, 2), " (", round(standardized_estimate, 2), ")", sep="")) |>
+  select(Effects = term, B = B_with_β, SE = std.error, `p-value` = p.value)
+
+# Highlighting significances with asteriks
+
+model_results_for_table_8.2$Significance <- ifelse(model_results_for_table_8.2$`p-value` < 0.001, "***",
+                                      ifelse(model_results_for_table_8.2$`p-value` < 0.01, "**",
+                                      ifelse(model_results_for_table_8.2$`p-value` < 0.05, "*",
+                                      ifelse(model_results_for_table_8.2$`p-value` < 0.1, "-", ""))))
+
+# Concatenating the B values with significance markers
+model_results_for_table_8.2$B <- paste0(model_results_for_table_8.2$B, " ", model_results_for_table_8.2$Significance)
+
+
+# Renaming terms for readability
+
+model_results_for_table_8.2$Effects <- factor(model_results_for_table_8.2$Effects,
+  levels = c("Intercept", "ee_support_reception", "ee_affiliation", "ee_relationships", 
+             "altruism_potential", "ee_gain_perception", "benefit_perception", 
+             "age", "compage", "gender", "oth_ori", "self_int", 
+             "altruism_potential:oth_ori", "benefit_perception:self_int"),
+  labels = c("Intercept -> EE Contribution", "EE Support Reception", "EE Affiliation", "EE Relationships", 
+             "Altruism Potential", "EE Gain Perception", "Benefit Perception", 
+             "Age", "Company Age", "Gender", "Other Orientation", "Self Interest", 
+             "Altruism Potential X Other Orientation", "Benefit Perception X Self Interest"))
+
+# Displaying the prepared data frame
+print(model_results_for_table_8.2)
+
+# Create output table
+
+results_table_8.2 <- flextable(model_results_for_table_8.2)
+
+# Print the table to view it
+print(results_table_8.2, preview = "html")
 
 
 ```
+
 
 
 ##### Compare models
 
 ```{r}
 
-compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3, multilevel_model_3.1, multilevel_model_4,multilevel_model_5, multilevel_model_6, multilevel_model_7, multilevel_model_8, multilevel_model_8, multilevel_model_8.1, multilevel_model_9)
+compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3, multilevel_model_3.1, multilevel_model_4,multilevel_model_5, multilevel_model_6, multilevel_model_7, multilevel_model_8, multilevel_model_8, multilevel_model_8.1, multilevel_model_8.2)
 
-plot(compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3, multilevel_model_3.1, multilevel_model_4,multilevel_model_5, multilevel_model_6, multilevel_model_7, multilevel_model_8, multilevel_model_8, multilevel_model_8.1, multilevel_model_9))
+plot(compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3, multilevel_model_3.1, multilevel_model_4,multilevel_model_5, multilevel_model_6, multilevel_model_7, multilevel_model_8, multilevel_model_8, multilevel_model_8.1,multilevel_model_8.2))
 
 ```
 
