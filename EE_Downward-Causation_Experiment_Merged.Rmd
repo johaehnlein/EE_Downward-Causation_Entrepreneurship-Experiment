@@ -796,7 +796,7 @@ The correlation table of the model includes the dependent variable, controls and
 ```{r}
 
 data |>
-  select(eecontlike, age, gender, compage, busexp, pubfund, programpart, gen_trust, self_int, oth_ori, ese, ep_inv, ep_dev, ep_fnd) |> #selecting variables
+  select(eecontlike, age, gender, compage, self_int, oth_ori) |> #selecting variables
   apa.cor.table() #creation of correlation matrix
 
 ```
@@ -1184,6 +1184,98 @@ both_rounds_models_std
 ```
 
 
+#### Violin Plot for all profiles
+
+##### Data structuring
+
+```{r}
+# Create a wide-format data frame with round 1 data only
+data_firstround <- data %>% 
+  filter(round_id == 1) %>% 
+  select(respondent_id, profile, eecontlike) %>% 
+  pivot_wider(id_cols = respondent_id, names_from = "profile", 
+              names_prefix = "Profile_", values_from = "eecontlike")
+
+# Create a wide-format data frame with round 2 data only
+data_replication <- data %>% 
+  filter(round_id == 2) %>% 
+  select(respondent_id, profile, eecontlike) %>% 
+  pivot_wider(id_cols = respondent_id, names_from = "profile", 
+              names_prefix = "Replication_", values_from = "eecontlike") %>% 
+  select(-respondent_id)
+
+# Combine both data frames into a single data frame
+data_deviation <- cbind(data_firstround, data_replication)
+
+# Compute the response deviation between rounds for each profile
+data_deviation <- data_deviation %>% 
+  mutate(Profile_1 = Replication_1 - Profile_1) %>% 
+  mutate(Profile_2 = Replication_2 - Profile_2) %>% 
+  mutate(Profile_3 = Replication_3 - Profile_3) %>% 
+  mutate(Profile_4 = Replication_4 - Profile_4) %>% 
+  mutate(Profile_5 = Replication_5 - Profile_5) %>% 
+  mutate(Profile_6 = Replication_6 - Profile_6) %>% 
+  mutate(Profile_7 = Replication_7 - Profile_7) %>% 
+  mutate(Profile_8 = Replication_8 - Profile_8) %>% 
+  
+  # Select relevant columns
+  select(respondent_id, Profile_1, Profile_2, Profile_3, Profile_4, Profile_5, 
+         Profile_6, Profile_7, Profile_8) %>% 
+  
+  # Pivot the wide data set into a long format
+  pivot_longer(!respondent_id, names_to = "Profile", values_to = "Deviation")
+```
+
+##### Creating the Violin Plot
+
+```{r, fig.width=9}
+# Determine the maximum and minimum deviation value
+max_deviation <- max(data_deviation$Deviation)
+min_deviation <- min(data_deviation$Deviation)
+# Set up the plot combining a violin plot with a box plot
+ggplot(data_deviation, aes(x = Profile, y = Deviation, fill = Profile)) +
+    # Draw a violin plot with a dark grey outline, trim it to the data range, 
+    #  and smooth its shape a little
+    geom_violin(width = 1.2, color = "darkgrey", trim = TRUE, adjust = 1.5) +
+    # Draw a slightly transparent box plot on top with a grey color and black 
+    #  outline, exclude the plotting of outliers
+    geom_boxplot(fill = "grey", colour = "black", width = 0.08, alpha = 0.5, 
+                 outlier.shape = NA) +
+    # Customize the labels of the y-axis to show the full range of deviation values
+    scale_y_continuous(breaks = seq(min_deviation, max_deviation, by = 1)) +
+    # Use a standard theme
+    theme_minimal() +
+    # Exclude plotting a legend
+    theme(legend.position = "none")
+```
+
+#### ICC Summaries by Profile - Effect Plot
+
+##### Data Structuring
+
+```{r}
+# Create a new dataframe with each profile's ICC values
+icc.data <- bind_rows(profile1_icc, profile2_icc, profile3_icc, profile4_icc,
+                    profile5_icc, profile6_icc, profile7_icc, profile8_icc) %>% 
+  rename(lower = "lower bound", upper = "upper bound")
+```
+
+#### Creating the Plot
+
+```{r}
+ggplot(data = icc.data, aes(x = Profile, y = ICC, 
+                          ymin = lower, ymax = upper)) + 
+  geom_pointrange() + 
+  geom_text(aes(label = ICC), nudge_x = 0.28) +
+  labs(title = "ICC Values -- Profiles 1-8",
+       subtitle = "95% Confidence Interval As Vertical Line",
+       x = NULL, 
+       y = "Intraclass Correlation Coefficients") + 
+  theme_minimal() # Use a standard theme
+```
+
+
+
 ### Step 4: Pooled Model
 
 In our last step, we advocate for estimating a pooled model that would include both rounds of data collection. The intent here is to improve consistency of the parameter estimates by taking advantage of the pooling and shrinkage inherent to these models, and to also improve consistency of inference by lowering the estimated standard errors (see Gelman, 2006). 
@@ -1206,7 +1298,7 @@ pooled_data <- data |>
 ```{r}
 
 # Fitting the model
-pooled_model <- lm(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + gender + compage + pubfund + startupcenter + programpart + gen_trust + self_int + oth_ori + ep_fnd, data = pooled_data)
+pooled_model <- lm(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + gender + compage + oth_ori + self_int, data = pooled_data)
 
 # Calculating clustered standard errors at the respondent and round levels
 pooled_cluster <- coeftest(pooled_model, vcov = vcovCL, cluster = ~ respondent_id + round_id)
@@ -1223,6 +1315,32 @@ vif_values_pooled_model <- vif(pooled_model)
 vif_dataframe_pooled_model <- data.frame(Variable = names(vif_values_pooled_model), VIF = vif_values_pooled_model)
 
 print(vif_dataframe_pooled_model)
+
+# Standardizing continuous predictors
+
+pooled_data$ee_support_reception_std <- scale(pooled_data$ee_support_reception, center = TRUE, scale = TRUE)
+pooled_data$ee_affiliation_std <- scale(pooled_data$ee_affiliation, center = TRUE, scale = TRUE)
+pooled_data$ee_relationships_std <- scale(pooled_data$ee_relationships, center = TRUE, scale = TRUE)
+pooled_data$altruism_potential_std <- scale(pooled_data$altruism_potential, center = TRUE, scale = TRUE)
+pooled_data$ee_gain_perception_std <- scale(pooled_data$ee_gain_perception, center = TRUE, scale = TRUE)
+pooled_data$benefit_perception_std <- scale(pooled_data$benefit_perception, center = TRUE, scale = TRUE)
+pooled_data$oth_ori_std <- scale(pooled_data$oth_ori, center = TRUE, scale = TRUE)
+pooled_data$self_int_std <- scale(pooled_data$self_int, center = TRUE, scale = TRUE)
+pooled_data$age_std <- scale(pooled_data$age, center = TRUE, scale = TRUE)
+pooled_data$compage_std <- scale(pooled_data$compage, center = TRUE, scale = TRUE)
+
+
+# Re-fitting the model with standardized predictors
+pooled_model_std <- lm(eecontlike ~ ee_support_reception_std + ee_affiliation_std + ee_relationships_std + altruism_potential_std + ee_gain_perception_std + benefit_perception_std + age_std + compage_std + gender + oth_ori_std + self_int_std , data = pooled_data)
+
+
+# Calculating clustered standard errors at the respondent and round levels
+pooled_cluster_std <- coeftest(pooled_model_std, vcov = vcovCL, cluster = ~ respondent_id + round_id)
+
+# Displaying the results
+tidy(pooled_cluster_std) |>
+  select(term, estimate, std.error, p.value) |>
+  mutate(p.value = round(p.value, digits = 4))
 
 ```
 
@@ -1633,6 +1751,40 @@ results_table_8.2 <- flextable(model_results_for_table_8.2)
 # Print the table to view it
 print(results_table_8.2, preview = "html")
 
+
+# Plot Interactions
+
+# Creating a data frame with the standardized predictors and the outcome variable
+plot_data <- pooled_data |>
+  select(eecontlike, altruism_potential_std, oth_ori_std, benefit_perception_std, self_int_std)
+
+# Creating a factor variable for the levels of the moderators
+plot_data$oth_ori_level <- cut(plot_data$oth_ori_std, breaks = c(-Inf, -1, 1, Inf), labels = c("Low (-1 SD)", "Mean", "High (+1 SD"))
+plot_data$self_int_level <- cut(plot_data$self_int_std, breaks = c(-Inf, -1, 1, Inf), labels = c("Low (-1 SD)", "Mean", "High (+1 SD"))
+
+# Plotting the interaction between altruism potential and other orientation
+ggplot(plot_data, aes(x = altruism_potential_std, y = eecontlike, color = oth_ori_level)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(method = "lm", se = FALSE, size = 1.2) +
+  labs(title = "Altruism Potential X Other Orientation",
+       x = "Altruism Potential",
+       y = "EE Contribution Likelihood",
+       color = "Other Orientation") +
+  theme_minimal() + 
+    theme(title = element_text(size = 18), axis.title = element_text(size = 16), 
+        axis.text = element_text(size = 14)) 
+
+# Plotting the interaction between benefit perception and self interest
+ggplot(plot_data, aes(x = benefit_perception_std, y = eecontlike, color = self_int_level)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(method = "lm", se = FALSE, size = 1.2) +
+  labs(title = "Benefit Perception X Self Interest",
+       x = "Benefit Perception",
+       y = "EE Contribution Likelihood",
+       color = "Self Interest") +
+  theme_minimal() + 
+    theme(title = element_text(size = 18), axis.title = element_text(size = 15), 
+        axis.text = element_text(size = 14)) 
 
 ```
 
