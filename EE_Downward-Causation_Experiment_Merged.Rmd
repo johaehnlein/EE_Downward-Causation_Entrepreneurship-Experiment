@@ -1751,7 +1751,6 @@ results_table_8.2 <- flextable(model_results_for_table_8.2)
 # Print the table to view it
 print(results_table_8.2, preview = "html")
 
-
 # Plot Interactions
 
 # Creating a data frame with the standardized predictors and the outcome variable
@@ -1760,54 +1759,60 @@ plot_data <- pooled_data |>
 
 # Creating a factor variable for the levels of the moderators
 plot_data$oth_ori_level <- ifelse(plot_data$oth_ori_std <= -1, "Low (-1 SD)", 
-                                  ifelse(plot_data$oth_ori_std >= 1, "High (+1 SD)", NA))
+                                  ifelse(plot_data$oth_ori_std >= 1, "High (+1 SD)", "Mean"))
 
 plot_data$self_int_level <- ifelse(plot_data$self_int_std <= -1, "Low (-1 SD)", 
-                                   ifelse(plot_data$self_int_std >= 1, "High (+1 SD)", NA))
+                                   ifelse(plot_data$self_int_std >= 1, "High (+1 SD)", "Mean"))
 
-# Filter out the NA values
-plot_data <- plot_data %>%
-  filter(!is.na(oth_ori_level))
-
-
+# No need to filter out NA values, as we have included the Mean level
 
 # Plotting the interaction between altruism potential and other orientation
-ggplot(plot_data, aes(x = altruism_potential_std, y = eecontlike, linetype = oth_ori_level)) +
-  geom_point(alpha = 0.1, color = "black") +
+ggplot(plot_data, aes(x = altruism_potential_std, y = eecontlike, color = oth_ori_level, fill = oth_ori_level)) +
+  geom_point(alpha = 0.1) +
   geom_smooth(data = subset(plot_data, oth_ori_level == "High (+1 SD)"),
-              method = "lm", se = FALSE, size = 1.2, color = "black") +
+              method = "lm", se = TRUE, size = 0.7, alpha = 0.2) +
+  geom_smooth(data = subset(plot_data, oth_ori_level == "Mean"),
+              method = "lm", se = TRUE, size = 0.7, alpha = 0.2) +
   geom_smooth(data = subset(plot_data, oth_ori_level == "Low (-1 SD)"),
-              method = "lm", se = FALSE, size = 1.2, linetype = "dashed", color = "black") +
-  scale_linetype_manual(values = c("High (+1 SD)" = "solid", 
-                                   "Low (-1 SD)" = "dashed")) +
+              method = "lm", se = TRUE, size = 0.7, alpha = 0.2) +
+  scale_color_manual(values = c("Low (-1 SD)" = "red", 
+                                "Mean" = "green", 
+                                "High (+1 SD)" = "blue")) +
+  scale_fill_manual(values = c("Low (-1 SD)" = "red", 
+                               "Mean" = "green", 
+                               "High (+1 SD)" = "blue")) +
   labs(title = "Altruism Potential X Other Orientation",
        x = "Altruism Potential",
        y = "EE Contribution Likelihood",
-       linetype = "Other Orientation") +
+       color = "Other Orientation Level",
+       fill = "Other Orientation Level") +
   theme_minimal() + 
-  theme(title = element_text(size = 14), axis.title = element_text(size = 12), 
-        axis.text = element_text(size = 12), legend.title = element_text(size = 12)) 
-
-# Filter out the NA values
-plot_data <- plot_data %>%
-  filter(!is.na(self_int_level))
+  theme(title = element_text(size = 18), axis.title = element_text(size = 16), 
+        axis.text = element_text(size = 14), legend.title = element_text(size = 14)) 
 
 # Plotting the interaction between benefit perception and self interest
-ggplot(plot_data, aes(x = benefit_perception_std, y = eecontlike, linetype = self_int_level)) +
-  geom_point(alpha = 0.1, color = "black") +
+ggplot(plot_data, aes(x = benefit_perception_std, y = eecontlike, color = self_int_level, fill = self_int_level)) +
+  geom_point(alpha = 0.1) +
   geom_smooth(data = subset(plot_data, self_int_level == "High (+1 SD)"),
-              method = "lm", se = FALSE, size = 1.2, color = "black") +
+              method = "lm", se = TRUE, size = 0.7, alpha = 0.2) +
+  geom_smooth(data = subset(plot_data, self_int_level == "Mean"),
+              method = "lm", se = TRUE, size = 0.7, alpha = 0.2) +
   geom_smooth(data = subset(plot_data, self_int_level == "Low (-1 SD)"),
-              method = "lm", se = FALSE, size = 1.2, linetype = "dashed", color = "black") +
-  scale_linetype_manual(values = c("High (+1 SD)" = "solid", 
-                                   "Low (-1 SD)" = "dashed")) +
+              method = "lm", se = TRUE, size = 0.7, alpha = 0.2) +
+  scale_color_manual(values = c("Low (-1 SD)" = "red", 
+                                "Mean" = "green", 
+                                "High (+1 SD)" = "blue")) +
+  scale_fill_manual(values = c("Low (-1 SD)" = "red", 
+                               "Mean" = "green", 
+                               "High (+1 SD)" = "blue")) +
   labs(title = "Benefit Perception X Self Interest",
        x = "Benefit Perception",
        y = "EE Contribution Likelihood",
-       linetype = "Self Interest") +
+       color = "Self Interest Level",
+       fill = "Self Interest Level") +
   theme_minimal() + 
-  theme(title = element_text(size = 12), axis.title = element_text(size = 12), 
-        axis.text = element_text(size = 12), legend.title = element_text(size = 12))
+  theme(title = element_text(size = 18), axis.title = element_text(size = 15), 
+        axis.text = element_text(size = 14), legend.title = element_text(size = 14))
 
 ```
 
