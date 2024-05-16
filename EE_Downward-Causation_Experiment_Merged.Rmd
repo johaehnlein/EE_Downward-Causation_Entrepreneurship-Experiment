@@ -1814,6 +1814,8 @@ ggplot(plot_data, aes(x = benefit_perception_std, y = eecontlike, color = self_i
   theme(title = element_text(size = 18), axis.title = element_text(size = 15), 
         axis.text = element_text(size = 14), legend.title = element_text(size = 14))
 
+##addition of new plots
+
 ```
 
 
