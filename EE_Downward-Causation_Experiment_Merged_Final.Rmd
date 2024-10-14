@@ -571,6 +571,76 @@ print(cfa_fit_table)
 
 ```
 
+#### CFA model (V2)
+
+```{r}
+
+# CFA model (v2)
+
+cfa_final_model <- "self_int =~ selfint1 + selfint2 + selfint3
+              oth_ori =~ othori1 + othori2 + othori3"
+
+```
+
+
+#### Model fit information (V3)
+
+```{r}
+
+cfa_final_fit <- cfa(cfa_final_model, data = data)
+
+summary(cfa_final_fit, fit.measures = TRUE)
+
+```
+
+
+### Standardization of results (V2)
+
+```{r}
+
+cfa_final_fit <- standardizedsolution(cfa_final_fit)
+
+summary(cfa_final_fit, fit.measures = TRUE)
+
+```
+
+### Calculating AVE for 'latent_variables'
+
+```{r}
+
+# Calculate squared loadings
+cfa_final_fit$squared_loading <- cfa_final_fit$est.std^2
+
+# Calculate AVE for each latent variable, assuming 'lhs' is the column for latent variables
+ave_values <- aggregate(squared_loading ~ lhs, data = cfa_final_fit, mean)
+
+# Rename columns for clarity
+colnames(ave_values) <- c("Latent Variable", "AVE")
+
+# Print the AVE values
+print(ave_values)
+
+```
+
+### CFA: Results Overview in a table (V2)
+
+```{r}
+
+cfa_final_fit <- cfa_final_fit |>
+  filter(op == "=~") |>
+  select(latent_var = lhs, indicators = rhs, std_loading = est.std ) |>
+  mutate(std_loading = round(std_loading, 3))
+
+cfa_final_fit_table <- flextable(cfa_final_fit) |>
+  autofit() |>
+  color(part = "header", color = "white") |>
+  bg(part = "header", bg = "gray") |>
+  align(align = "center", part = "all") |>
+  fontsize(size = 12, part = "all")
+
+print(cfa_final_fit_table)
+
+```
 
 ### Calculating Cronbach's alpha
 
@@ -1778,6 +1848,270 @@ results_table_8.2 <- flextable(model_results_for_table_8.2)
 # Print the table to view it
 print(results_table_8.2, preview = "html")
 
+```
+
+
+
+##### Compare models
+
+```{r}
+
+compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3, multilevel_model_3.1, multilevel_model_4,multilevel_model_5, multilevel_model_6, multilevel_model_7, multilevel_model_8, multilevel_model_8, multilevel_model_8.1, multilevel_model_8.2)
+
+plot(compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3, multilevel_model_3.1, multilevel_model_4,multilevel_model_5, multilevel_model_6, multilevel_model_7, multilevel_model_8, multilevel_model_8, multilevel_model_8.1,multilevel_model_8.2))
+
+```
+
+
+##### Final models
+
+We subsequently develop the final reported models according to the 4 step guidline as provide by Aguinis et al. (2013).
+
+###### Null model
+
+```{r}
+
+# Null Model for ICC Calculation
+null_model <- lmer(eecontlike ~ 1 + (1 | respondent_id), data = pooled_data)
+
+# Displaying the results of the Null Model
+null_model_summary <- summary(null_model)
+print(null_model_summary)
+
+# Calculate and display ICC
+icc_null_model <- as.numeric(null_model_summary$varcor$respondent_id[1]) / (as.numeric(null_model_summary$varcor$respondent_id[1]) + null_model_summary$sigma^2)
+print(paste("Intraclass Correlation Coefficient (ICC):", icc_null_model))
+
+# Extract results for table - Non-standardized
+results_nonstd_null <- tidy(null_model, effects = "fixed") |>
+  select(term, estimate = estimate, std.error, p.value) |>
+  mutate(term = as.character(term),
+         p.value = round(p.value, digits = 3))
+
+
+```
+
+###### RIFS model
+
+```{r}
+
+# RIFS Model: Random Intercepts and Fixed Slopes
+rifs_model <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + (1 | respondent_id), data = pooled_data)
+
+# Displaying the results of the RIFS Model
+rifs_model_summary <- summary(rifs_model)
+print(rifs_model_summary)
+
+# Extracting results for non-standardized estimates
+results_nonstd_rifs <- tidy(rifs_model, effects = "fixed") |>
+  select(term, estimate = estimate, std.error, p.value) |>
+  mutate(term = as.character(term),
+         p.value = round(p.value, digits = 3))
+
+# Standardizing predictors and re-fitting the model for standardized estimates
+# As the predictors are the same, re-use the previously created standardized variables
+rifs_model_std <- lmer(eecontlike ~ ee_support_reception_std + ee_affiliation_std + ee_relationships_std + altruism_potential_std + ee_gain_perception_std + benefit_perception_std + age_std + compage_std + gender + (1 | respondent_id), data = pooled_data)
+
+# Displaying standardized results
+results_std_rifs <- tidy(rifs_model_std, effects = "fixed") |>
+  select(term, std_estimate = estimate) |>
+  mutate(term = as.character(term))
+
+# Merging the non-standardized and standardized results
+consolidated_results_rifs <- results_nonstd_rifs |>
+  mutate(standardized_estimate = results_std_rifs$std_estimate)
+
+# Preparing final data frame for table generation
+# Standardized estimates (β) are presented alongside B in parenthesis
+model_results_for_table_rifs <- consolidated_results_rifs |>
+  mutate(B_with_β = paste(round(estimate, 2), " (", round(standardized_estimate, 2), ")", sep="")) |>
+  select(Effects = term, B = B_with_β, SE = std.error, `p-value` = p.value)
+
+# Highlighting significances with asterisks
+model_results_for_table_rifs$Significance <- ifelse(model_results_for_table_rifs$`p-value` < 0.001, "***",
+                                      ifelse(model_results_for_table_rifs$`p-value` < 0.01, "**",
+                                      ifelse(model_results_for_table_rifs$`p-value` < 0.05, "*",
+                                      ifelse(model_results_for_table_rifs$`p-value` < 0.1, "-", ""))))
+
+# Concatenating the B values with significance markers
+model_results_for_table_rifs$B <- paste0(model_results_for_table_rifs$B, " ", model_results_for_table_rifs$Significance)
+
+# Displaying the prepared data frame
+print(model_results_for_table_rifs)
+
+# Optionally, create output table using `flextable`
+results_table_rifs <- flextable(model_results_for_table_rifs)
+print(results_table_rifs, preview = "html")
+
+
+```
+
+###### RIRS model
+
+```{r}
+
+# RIRS Model: Random Intercepts and Random Slopes without Cross-Level Interactions
+rirs_model_no_cli <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + (ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception | respondent_id), data = pooled_data)
+
+# Displaying the results of the RIRS Model without Cross-Level Interactions
+rirs_no_cli_summary <- summary(rirs_model_no_cli)
+print(rirs_no_cli_summary)
+
+# Extracting results for non-standardized estimates
+results_nonstd_rirs_no_cli <- tidy(rirs_model_no_cli, effects = "fixed") |>
+  select(term, estimate = estimate, std.error, p.value) |>
+  mutate(term = as.character(term),
+         p.value = round(p.value, digits = 3))
+
+# Standardizing predictors and re-fitting the model for standardized estimates
+# As the predictors are the same, re-use the previously created standardized variables
+rirs_model_no_cli_std <- lmer(eecontlike ~ ee_support_reception_std + ee_affiliation_std + ee_relationships_std + altruism_potential_std + ee_gain_perception_std + benefit_perception_std + age_std + compage_std + gender + (ee_support_reception_std + ee_affiliation_std + ee_relationships_std + altruism_potential_std + ee_gain_perception_std + benefit_perception_std | respondent_id), data = pooled_data)
+
+# Displaying standardized results
+results_std_rirs_no_cli <- tidy(rirs_model_no_cli_std, effects = "fixed") |>
+  select(term, std_estimate = estimate) |>
+  mutate(term = as.character(term))
+
+# Merging the non-standardized and standardized results
+consolidated_results_rirs_no_cli <- results_nonstd_rirs_no_cli |>
+  mutate(standardized_estimate = results_std_rirs_no_cli$std_estimate)
+
+# Preparing final data frame for table generation
+# Standardized estimates (β) are presented alongside B in parenthesis
+model_results_for_table_rirs_no_cli <- consolidated_results_rirs_no_cli |>
+  mutate(B_with_β = paste(round(estimate, 2), " (", round(standardized_estimate, 2), ")", sep="")) |>
+  select(Effects = term, B = B_with_β, SE = std.error, `p-value` = p.value)
+
+# Highlighting significances with asterisks
+model_results_for_table_rirs_no_cli$Significance <- ifelse(model_results_for_table_rirs_no_cli$`p-value` < 0.001, "***",
+                                      ifelse(model_results_for_table_rirs_no_cli$`p-value` < 0.01, "**",
+                                      ifelse(model_results_for_table_rirs_no_cli$`p-value` < 0.05, "*",
+                                      ifelse(model_results_for_table_rirs_no_cli$`p-value` < 0.1, "-", ""))))
+
+# Concatenating the B values with significance markers
+model_results_for_table_rirs_no_cli$B <- paste0(model_results_for_table_rirs_no_cli$B, " ", model_results_for_table_rirs_no_cli$Significance)
+
+# Displaying the prepared data frame
+print(model_results_for_table_rirs_no_cli)
+
+# Optionally, create output table using `flextable`
+results_table_rirs_no_cli <- flextable(model_results_for_table_rirs_no_cli)
+print(results_table_rirs_no_cli, preview = "html")
+
+
+
+```
+
+###### RIRS with cross-level interactions
+
+```{r}
+
+# Fitting the model
+multilevel_model_rirs_cli <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + oth_ori*altruism_potential + self_int*benefit_perception + (1 + oth_ori + self_int | respondent_id), data = pooled_data)
+
+# Displaying the results
+tidy(multilevel_model_rirs_cli, effects = "fixed") |> 
+  select(term, estimate, std.error, p.value) |> 
+  mutate(p.value = round(p.value, digits = 3))
+
+
+# Display model performance
+multilevel_model_rirs_cli_perf <- performance::model_performance(multilevel_model_rirs_cli)
+
+multilevel_model_rirs_cli_perf
+
+r2(multilevel_model_rirs_cli)
+
+
+# Standardizing continuous predictors
+
+pooled_data$ee_support_reception_std <- scale(pooled_data$ee_support_reception, center = TRUE, scale = TRUE)
+pooled_data$ee_affiliation_std <- scale(pooled_data$ee_affiliation, center = TRUE, scale = TRUE)
+pooled_data$ee_relationships_std <- scale(pooled_data$ee_relationships, center = TRUE, scale = TRUE)
+pooled_data$altruism_potential_std <- scale(pooled_data$altruism_potential, center = TRUE, scale = TRUE)
+pooled_data$ee_gain_perception_std <- scale(pooled_data$ee_gain_perception, center = TRUE, scale = TRUE)
+pooled_data$benefit_perception_std <- scale(pooled_data$benefit_perception, center = TRUE, scale = TRUE)
+pooled_data$oth_ori_std <- scale(pooled_data$oth_ori, center = TRUE, scale = TRUE)
+pooled_data$self_int_std <- scale(pooled_data$self_int, center = TRUE, scale = TRUE)
+pooled_data$age_std <- scale(pooled_data$age, center = TRUE, scale = TRUE)
+pooled_data$compage_std <- scale(pooled_data$compage, center = TRUE, scale = TRUE)
+
+# Creating standardized interaction terms
+pooled_data$oth_ori_altruism_potential_std <- pooled_data$oth_ori_std * pooled_data$altruism_potential_std
+pooled_data$self_int_benefit_perception_std <- pooled_data$self_int_std * pooled_data$benefit_perception_std
+
+# Re-fitting the model with standardized predictors
+multilevel_model_rirs_cli_std <- lmer(eecontlike ~ ee_support_reception_std + ee_affiliation_std + ee_relationships_std + altruism_potential_std + ee_gain_perception_std + benefit_perception_std + age_std + compage_std + gender + oth_ori_std*altruism_potential_std + self_int_std*benefit_perception_std + (1 + oth_ori_std + self_int_std | respondent_id), data = pooled_data)
+
+
+# Displaying the results
+tidy(multilevel_model_rirs_cli_std, effects = "fixed") |> 
+  select(term, estimate, std.error, p.value) |> 
+  mutate(p.value = round(p.value, digits = 3))
+
+# Display model performance
+multilevel_model_rirs_cli_std_perf <- performance::model_performance(multilevel_model_rirs_cli_std)
+
+multilevel_model_rirs_cli_std_perf
+
+r2(multilevel_model_rirs_cli_std)
+
+# Extracting results from non-standardized model
+results_nonstd_rirs_cli <- tidy(multilevel_model_rirs_cli, effects = "fixed") |>
+  select(term, estimate = estimate, std.error, p.value) |>
+  mutate(term = as.character(term),
+         p.value = round(p.value, digits = 3))
+
+# Extracting results from standardized model for standardized estimates (β)
+results_std_rirs_cli <- tidy(multilevel_model_rirs_cli_std, effects = "fixed") |>
+  select(term, std_estimate = estimate) |>
+  mutate(term = as.character(term))
+
+# Merging the non-standardized and standardized results
+
+consolidated_results_rirs_cli <- results_nonstd_rirs_cli |>
+  mutate(standardized_estimate = results_std_rirs_cli$std_estimate)
+
+
+# Preparing final data frame for table generation
+# standardized estimates (β) are to be presented alongside B in parenthesis
+model_results_for_table_rirs_cli <- consolidated_results_rirs_cli |>
+  mutate(B_with_β = paste(round(estimate, 2), " (", round(standardized_estimate, 2), ")", sep="")) |>
+  select(Effects = term, B = B_with_β, SE = std.error, `p-value` = p.value)
+
+# Highlighting significances with asteriks
+
+model_results_for_table_rirs_cli$Significance <- ifelse(model_results_for_table_rirs_cli$`p-value` < 0.001, "***",
+                                      ifelse(model_results_for_table_rirs_cli$`p-value` < 0.01, "**",
+                                      ifelse(model_results_for_table_rirs_cli$`p-value` < 0.05, "*",
+                                      ifelse(model_results_for_table_rirs_cli$`p-value` < 0.1, "-", ""))))
+
+# Concatenating the B values with significance markers
+model_results_for_table_rirs_cli$B <- paste0(model_results_for_table_rirs_cli$B, " ", model_results_for_table_rirs_cli$Significance)
+
+
+# Renaming terms for readability
+
+model_results_for_table_rirs_cli$Effects <- factor(model_results_for_table_rirs_cli$Effects,
+  levels = c("Intercept", "ee_support_reception", "ee_affiliation", "ee_relationships", 
+             "altruism_potential", "ee_gain_perception", "benefit_perception", 
+             "age", "compage", "gender", "oth_ori", "self_int", 
+             "altruism_potential:oth_ori", "benefit_perception:self_int"),
+  labels = c("Intercept -> EE Contribution", "EE Support Reception", "EE Affiliation", "EE Relationships", 
+             "Altruism Potential", "EE Gain Perception", "Benefit Perception", 
+             "Age", "Company Age", "Gender", "Other Orientation", "Self Interest", 
+             "Altruism Potential X Other Orientation", "Benefit Perception X Self Interest"))
+
+# Displaying the prepared data frame
+print(model_results_for_table_rirs_cli)
+
+# Create output table
+
+results_table_rirs_cli <- flextable(model_results_for_table_rirs_cli)
+
+# Print the table to view it
+print(results_table_rirs_cli, preview = "html")
+
 # Plot Interactions
 
 # Creating a data frame with the standardized predictors and the outcome variable
@@ -1845,23 +2179,6 @@ ggplot(plot_data, aes(x = benefit_perception_std, y = eecontlike, color = self_i
 
 
 ```
-
-
-
-##### Compare models
-
-```{r}
-
-compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3, multilevel_model_3.1, multilevel_model_4,multilevel_model_5, multilevel_model_6, multilevel_model_7, multilevel_model_8, multilevel_model_8, multilevel_model_8.1, multilevel_model_8.2)
-
-plot(compare_performance(multilevel_model_1, multilevel_model_2, multilevel_model_3, multilevel_model_3.1, multilevel_model_4,multilevel_model_5, multilevel_model_6, multilevel_model_7, multilevel_model_8, multilevel_model_8, multilevel_model_8.1,multilevel_model_8.2))
-
-```
-
-
-
-
-
 
 
 
