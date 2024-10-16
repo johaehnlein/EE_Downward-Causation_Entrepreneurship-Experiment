@@ -36,6 +36,7 @@ library(psych) # Used to calculate Cronbach's Alpha and ICC values
 library(apaTables) # Used to create correlation tables
 library(car) # used to calculate VIF
 library(lme4) # Used for multilevel modeling 
+library(MuMIn) # Used to obtain residual variance values
 library(lmerTest) # Used for multilevel regression adding p-values to the lme4 package
 library(lmtest) # For calculating robust standard errors
 library(broom) # Used to create tidy data frames with model results
@@ -1902,6 +1903,28 @@ rifs_model <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relat
 rifs_model_summary <- summary(rifs_model)
 print(rifs_model_summary)
 
+# Extract variance components for RIFS model
+variance_components_rifs <- VarCorr(rifs_model)
+print(variance_components_rifs)
+
+# Display model performance for RIFS model
+performance_rifs <- performance::model_performance(rifs_model)
+print(performance_rifs)
+
+# R-squared values for RIFS model
+r_squared_rifs <- r2(rifs_model)
+print(r_squared_rifs)
+
+rifs_summary <- tibble(
+  Model = "RIFS",
+  Residual_Variance = attr(variance_components_rifs, "sc")^2,
+  Intercept_Variance = variance_components_rifs$respondent_id[1],
+  Marginal_R2 = r_squared_rifs$conditional,
+  Conditional_R2 = r_squared_rifs$marginal,
+  AIC = performance_rifs$AIC,
+  BIC = performance_rifs$BIC
+)
+
 # Extracting results for non-standardized estimates
 results_nonstd_rifs <- tidy(rifs_model, effects = "fixed") |>
   select(term, estimate = estimate, std.error, p.value) |>
@@ -1951,11 +1974,35 @@ print(results_table_rifs, preview = "html")
 ```{r}
 
 # RIRS Model: Random Intercepts and Random Slopes without Cross-Level Interactions
-rirs_model_no_cli <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + (ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception | respondent_id), data = pooled_data)
+rirs_model_no_cli <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + (ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception | respondent_id), data = pooled_data, control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5)))
 
 # Displaying the results of the RIRS Model without Cross-Level Interactions
 rirs_no_cli_summary <- summary(rirs_model_no_cli)
 print(rirs_no_cli_summary)
+
+# Extract variance components for RIRS model
+variance_components_rirs_no_cli <- VarCorr(rirs_model_no_cli)
+print(variance_components_rirs_no_cli)
+
+# Display model performance for RIRS model
+performance_rirs_no_cli <- performance::model_performance(rirs_model_no_cli)
+print(performance_rirs_no_cli)
+
+# R-squared values for RIRS model
+r_squared_rirs_no_cli <- r2(rirs_model_no_cli)
+print(r_squared_rirs_no_cli)
+
+rirs_no_cli_summary <- tibble(
+  Model = "RIRS No CLI",
+  Residual_Variance = attr(variance_components_rirs_no_cli, "sc")^2,
+  Intercept_Variance = variance_components_rirs_no_cli$respondent_id[1],
+  Slope_Variance = variance_components_rirs_no_cli$respondent_id[2],
+  Slope_Covariance = variance_components_rirs_no_cli$respondent_id[3],
+  Marginal_R2 = r_squared_rirs_no_cli$conditional,
+  Conditional_R2 = r_squared_rirs_no_cli$marginal,
+  AIC = performance_rirs_no_cli$AIC,
+  BIC = performance_rirs_no_cli$BIC
+)
 
 # Extracting results for non-standardized estimates
 results_nonstd_rirs_no_cli <- tidy(rirs_model_no_cli, effects = "fixed") |>
@@ -1994,12 +2041,6 @@ model_results_for_table_rirs_no_cli$B <- paste0(model_results_for_table_rirs_no_
 # Displaying the prepared data frame
 print(model_results_for_table_rirs_no_cli)
 
-# Optionally, create output table using `flextable`
-results_table_rirs_no_cli <- flextable(model_results_for_table_rirs_no_cli)
-print(results_table_rirs_no_cli, preview = "html")
-
-
-
 ```
 
 ###### RIRS with cross-level interactions
@@ -2015,13 +2056,29 @@ tidy(multilevel_model_rirs_cli, effects = "fixed") |>
   mutate(p.value = round(p.value, digits = 3))
 
 
-# Display model performance
-multilevel_model_rirs_cli_perf <- performance::model_performance(multilevel_model_rirs_cli)
+# Extract variance components for RIRS model with CLI
+variance_components_rirs_cli <- VarCorr(multilevel_model_rirs_cli)
+print(variance_components_rirs_cli)
 
-multilevel_model_rirs_cli_perf
+# Display model performance for RIRS model with CLI
+performance_rirs_cli <- performance::model_performance(multilevel_model_rirs_cli)
+print(performance_rirs_cli)
 
-r2(multilevel_model_rirs_cli)
+# R-squared values for RIRS model with CLI
+r_squared_rirs_cli <- r2(multilevel_model_rirs_cli)
+print(r_squared_rirs_cli)
 
+rirs_cli_summary <- tibble(
+  Model = "RIRS with CLI",
+  Residual_Variance = attr(variance_components_rirs_cli, "sc")^2,
+  Intercept_Variance = variance_components_rirs_cli$respondent_id[1],
+  Slope_Variance = variance_components_rirs_cli$respondent_id[2],
+  Slope_Covariance = variance_components_rirs_cli$respondent_id[3],
+  Marginal_R2 = r_squared_rirs_cli$conditional,
+  Conditional_R2 = r_squared_rirs_cli$marginal,
+  AIC = performance_rirs_cli$AIC,
+  BIC = performance_rirs_cli$BIC
+)
 
 # Standardizing continuous predictors
 
@@ -2180,9 +2237,13 @@ ggplot(plot_data, aes(x = benefit_perception_std, y = eecontlike, color = self_i
 
 ```
 
+###### Checks
 
+```{r}
 
-
+# Checking if the model has converged
+print(convergence(rirs_model_no_cli))
+```
 
 
 
