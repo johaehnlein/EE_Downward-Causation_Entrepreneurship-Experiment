@@ -1982,7 +1982,7 @@ print(results_table_rifs, preview = "html")
 ```{r}
 
 # RIRS Model: Random Intercepts and Random Slopes without Cross-Level Interactions
-rirs_model_no_cli <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + (ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception | respondent_id), data = pooled_data, control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5)))
+rirs_model_no_cli <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception + age + compage + gender + (ee_support_reception + ee_affiliation + ee_relationships + altruism_potential + ee_gain_perception + benefit_perception | respondent_id), data = pooled_data)
 
 # Displaying the results of the RIRS Model without Cross-Level Interactions
 rirs_no_cli_summary <- summary(rirs_model_no_cli)
@@ -2172,81 +2172,51 @@ print(results_table_rirs_cli, preview = "html")
 # Plot Interactions
 
 # Creating a data frame with the standardized predictors and the outcome variable
-plot_data <- pooled_data |>
-  select(eecontlike, altruism_potential_std, oth_ori_std, benefit_perception_std, self_int_std)
-
-# Creating a factor variable for the levels of the moderators
-plot_data$oth_ori_level <- ifelse(plot_data$oth_ori_std <= -1, "Low (-1 SD)", 
-                                  ifelse(plot_data$oth_ori_std >= 1, "High (+1 SD)", "Mean"))
-
-plot_data$self_int_level <- ifelse(plot_data$self_int_std <= -1, "Low (-1 SD)", 
-                                   ifelse(plot_data$self_int_std >= 1, "High (+1 SD)", "Mean"))
-
-# No need to filter out NA values, as we have included the Mean level
+plot_data <- pooled_data %>%
+  select(eecontlike, altruism_potential_std, oth_ori_std, benefit_perception_std, self_int_std) %>%
+  mutate(
+    # Adjust the data by rounding to the nearest whole number (0 or 1)
+    altruism_potential_std = ifelse(altruism_potential_std > 0, 1, 0),
+    benefit_perception_std = ifelse(benefit_perception_std > 0, 1, 0),
+    # Convert to factors with the correct levels and labels
+    altruism_potential_std = factor(altruism_potential_std, levels = c(0, 1), labels = c("Low", "High")),
+    benefit_perception_std = factor(benefit_perception_std, levels = c(0, 1), labels = c("Low", "High")),
+    # Recreate moderator levels
+    oth_ori_level = ifelse(oth_ori_std <= -1, "Low (-1 SD)", ifelse(oth_ori_std >= 1, "High (+1 SD)", "Mean")),
+    self_int_level = ifelse(self_int_std <= -1, "Low (-1 SD)", ifelse(self_int_std >= 1, "High (+1 SD)", "Mean"))
+  )
 
 # Plotting the interaction between altruism potential and other orientation
-ggplot(plot_data, aes(x = altruism_potential_std, y = eecontlike, color = oth_ori_level, fill = oth_ori_level)) +
+ggplot(plot_data, aes(x = altruism_potential_std, y = eecontlike, color = oth_ori_level, group = oth_ori_level)) +
   geom_point(alpha = 0.1) +
-  geom_smooth(data = subset(plot_data, oth_ori_level == "High (+1 SD)"),
-              method = "lm", se = TRUE, size = 1.2, alpha = 0.3) +
-  geom_smooth(data = subset(plot_data, oth_ori_level == "Mean"),
-              method = "lm", se = TRUE, size = 1.2, alpha = 0.3) +
-  geom_smooth(data = subset(plot_data, oth_ori_level == "Low (-1 SD)"),
-              method = "lm", se = TRUE, size = 1.2, alpha = 0.3) +
-  scale_color_manual(values = c("Low (-1 SD)" = "tomato3", 
-                                "Mean" = "palegreen3", 
-                                "High (+1 SD)" = "steelblue3")) +
-  scale_fill_manual(values = c("Low (-1 SD)" = "tomato3", 
-                               "Mean" = "palegreen3", 
-                               "High (+1 SD)" = "steelblue3")) +
-  labs(title = "Altruism Potential X Other Orientation",
-       x = "Altruism Potential",
-       y = "EE Contribution Likelihood",
-       color = "Other Orientation",
-       fill = "Other Orientation") +
-  theme_minimal() + 
-  theme(title = element_text(size = 18), axis.title = element_text(size = 16), 
-        axis.text = element_text(size = 14), legend.title = element_text(size = 14)) +
-  coord_cartesian(xlim = c(0, 1))
+  geom_line(aes(linetype = oth_ori_level)) +
+  scale_color_manual(values = c("High (+1 SD)" = "steelblue", "Mean" = "darkgreen", "Low (-1 SD)" = "red")) +
+  scale_linetype_manual(values = c("High (+1 SD)" = "solid", "Mean" = "dashed", "Low (-1 SD)" = "dotted")) +
+  labs(x = "Altruism Potential", y = "EE Contribution Likelihood", color = "Other Orientation Level", linetype = "Other Orientation Level") +
+  theme_minimal() +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 14),
+        legend.title = element_text(size = 14),
+        panel.grid.major = element_blank(),  # Removing all major grid lines
+        plot.title = element_blank())
+
 
 # Plotting the interaction between benefit perception and self interest
-ggplot(plot_data, aes(x = benefit_perception_std, y = eecontlike, color = self_int_level, fill = self_int_level)) +
+ggplot(plot_data, aes(x = benefit_perception_std, y = eecontlike, color = self_int_level, group = self_int_level)) +
   geom_point(alpha = 0.1) +
-  geom_smooth(data = subset(plot_data, self_int_level == "High (+1 SD)"),
-              method = "lm", se = TRUE, size = 1.2, alpha = 0.3) +
-  geom_smooth(data = subset(plot_data, self_int_level == "Mean"),
-              method = "lm", se = TRUE, size = 1.2, alpha = 0.3) +
-  geom_smooth(data = subset(plot_data, self_int_level == "Low (-1 SD)"),
-              method = "lm", se = TRUE, size = 1.2, alpha = 0.3) +
-  scale_color_manual(values = c("Low (-1 SD)" = "tomato3", 
-                                "Mean" = "palegreen3", 
-                                "High (+1 SD)" = "steelblue3")) +
-  scale_fill_manual(values = c("Low (-1 SD)" = "tomato3", 
-                               "Mean" = "palegreen3", 
-                               "High (+1 SD)" = "steelblue3")) +
-  labs(title = "Benefit Perception X Self Interest",
-       x = "Benefit Perception",
-       y = "EE Contribution Likelihood",
-       color = "Self Interest",
-       fill = "Self Interest") +
-  theme_minimal() + 
-  theme(title = element_text(size = 18), axis.title = element_text(size = 15), 
-        axis.text = element_text(size = 14), legend.title = element_text(size = 14)) +
-  coord_cartesian(xlim = c(0, 1))
+  geom_line(aes(linetype = self_int_level)) +
+  scale_color_manual(values = c("High (+1 SD)" = "steelblue", "Mean" = "darkgreen", "Low (-1 SD)" = "red")) +
+  scale_linetype_manual(values = c("High (+1 SD)" = "solid", "Mean" = "dashed", "Low (-1 SD)" = "dotted")) +
+  labs(x = "Benefit Perception", y = "EE Contribution Likelihood", color = "Self Interest Level", linetype = "Self Interest Level") +
+  theme_minimal() +
+  theme(axis.title = element_text(size = 16),
+        axis.text = element_text(size = 14),
+        legend.title = element_text(size = 14),
+        panel.grid.major = element_blank(),  # Removing all major grid lines
+        plot.title = element_blank())
 
 
 ```
-
-###### Checks
-
-```{r}
-
-# Checking if the model has converged
-print(convergence(rirs_model_no_cli))
-```
-
-
-
 
 
 
