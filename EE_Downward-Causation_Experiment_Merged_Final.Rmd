@@ -1911,6 +1911,10 @@ print(variance_components_rifs)
 performance_rifs <- performance::model_performance(rifs_model)
 print(performance_rifs)
 
+# Unstandardized Confidence Intervals
+confint_rifs <- confint(rifs_model, level = 0.95)
+print(confint_rifs)
+
 # R-squared values for RIFS model
 r_squared_rifs <- r2(rifs_model)
 print(r_squared_rifs)
@@ -1939,6 +1943,10 @@ rifs_model_std <- lmer(eecontlike ~ ee_support_reception_std + ee_affiliation_st
 results_std_rifs <- tidy(rifs_model_std, effects = "fixed") |>
   select(term, std_estimate = estimate) |>
   mutate(term = as.character(term))
+
+# Standardized Confidence Intervals
+confint_rifs_std <- confint(rifs_model_std, level = 0.95)
+print(confint_rifs_std)
 
 # Merging the non-standardized and standardized results
 consolidated_results_rifs <- results_nonstd_rifs |>
@@ -1988,21 +1996,13 @@ print(variance_components_rirs_no_cli)
 performance_rirs_no_cli <- performance::model_performance(rirs_model_no_cli)
 print(performance_rirs_no_cli)
 
+# Unstandardized Confidence Intervals
+confint_rirs_no_cli <- confint(rirs_model_no_cli, level = 0.95)
+print(confint_rirs_no_cli)
+
 # R-squared values for RIRS model
 r_squared_rirs_no_cli <- r2(rirs_model_no_cli)
 print(r_squared_rirs_no_cli)
-
-rirs_no_cli_summary <- tibble(
-  Model = "RIRS No CLI",
-  Residual_Variance = attr(variance_components_rirs_no_cli, "sc")^2,
-  Intercept_Variance = variance_components_rirs_no_cli$respondent_id[1],
-  Slope_Variance = variance_components_rirs_no_cli$respondent_id[2],
-  Slope_Covariance = variance_components_rirs_no_cli$respondent_id[3],
-  Marginal_R2 = r_squared_rirs_no_cli$conditional,
-  Conditional_R2 = r_squared_rirs_no_cli$marginal,
-  AIC = performance_rirs_no_cli$AIC,
-  BIC = performance_rirs_no_cli$BIC
-)
 
 # Extracting results for non-standardized estimates
 results_nonstd_rirs_no_cli <- tidy(rirs_model_no_cli, effects = "fixed") |>
@@ -2011,13 +2011,16 @@ results_nonstd_rirs_no_cli <- tidy(rirs_model_no_cli, effects = "fixed") |>
          p.value = round(p.value, digits = 3))
 
 # Standardizing predictors and re-fitting the model for standardized estimates
-# As the predictors are the same, re-use the previously created standardized variables
 rirs_model_no_cli_std <- lmer(eecontlike ~ ee_support_reception_std + ee_affiliation_std + ee_relationships_std + altruism_potential_std + ee_gain_perception_std + benefit_perception_std + age_std + compage_std + gender + (ee_support_reception_std + ee_affiliation_std + ee_relationships_std + altruism_potential_std + ee_gain_perception_std + benefit_perception_std | respondent_id), data = pooled_data)
 
 # Displaying standardized results
 results_std_rirs_no_cli <- tidy(rirs_model_no_cli_std, effects = "fixed") |>
   select(term, std_estimate = estimate) |>
   mutate(term = as.character(term))
+
+# Sstandardized Confidence Intervals
+confint_rirs_no_cli_std <- confint(rirs_model_no_cli_std, level = 0.95)
+print(confint_rirs_no_cli_std)
 
 # Merging the non-standardized and standardized results
 consolidated_results_rirs_no_cli <- results_nonstd_rirs_no_cli |>
@@ -2064,21 +2067,14 @@ print(variance_components_rirs_cli)
 performance_rirs_cli <- performance::model_performance(multilevel_model_rirs_cli)
 print(performance_rirs_cli)
 
+# Unstandardized Confidence Intervals
+confint_multilevel_model_rirs_cli <- confint(multilevel_model_rirs_cli, level = 0.95)
+print(confint_multilevel_model_rirs_cli)
+
+
 # R-squared values for RIRS model with CLI
 r_squared_rirs_cli <- r2(multilevel_model_rirs_cli)
 print(r_squared_rirs_cli)
-
-rirs_cli_summary <- tibble(
-  Model = "RIRS with CLI",
-  Residual_Variance = attr(variance_components_rirs_cli, "sc")^2,
-  Intercept_Variance = variance_components_rirs_cli$respondent_id[1],
-  Slope_Variance = variance_components_rirs_cli$respondent_id[2],
-  Slope_Covariance = variance_components_rirs_cli$respondent_id[3],
-  Marginal_R2 = r_squared_rirs_cli$conditional,
-  Conditional_R2 = r_squared_rirs_cli$marginal,
-  AIC = performance_rirs_cli$AIC,
-  BIC = performance_rirs_cli$BIC
-)
 
 # Standardizing continuous predictors
 
@@ -2112,6 +2108,10 @@ multilevel_model_rirs_cli_std_perf <- performance::model_performance(multilevel_
 multilevel_model_rirs_cli_std_perf
 
 r2(multilevel_model_rirs_cli_std)
+
+# Standardized Confidence Intervals
+confint_multilevel_model_rirs_cli_std <- confint(multilevel_model_rirs_cli_std, level = 0.95)
+print(confint_multilevel_model_rirs_cli_std)
 
 # Extracting results from non-standardized model
 results_nonstd_rirs_cli <- tidy(multilevel_model_rirs_cli, effects = "fixed") |>
