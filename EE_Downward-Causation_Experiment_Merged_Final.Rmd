@@ -49,7 +49,11 @@ library(sandwich) # Used for cluster robust standard errors
 library(flextable) # Used for table creation
 library(see) # used to analyze and compare the performance of multi-level models
 library(dplyr) 
-library(ggplot2) 
+library(ggplot2)
+library(jtools)
+library(interactions)
+library(sjPlot)
+
 ```
 
 # Data
@@ -2169,51 +2173,89 @@ results_table_rirs_cli <- flextable(model_results_for_table_rirs_cli)
 # Print the table to view it
 print(results_table_rirs_cli, preview = "html")
 
-# Plot Interactions
 
-# Creating a data frame with the standardized predictors and the outcome variable
-plot_data <- pooled_data %>%
-  select(eecontlike, altruism_potential_std, oth_ori_std, benefit_perception_std, self_int_std) %>%
-  mutate(
-    # Adjust the data by rounding to the nearest whole number (0 or 1)
-    altruism_potential_std = ifelse(altruism_potential_std > 0, 1, 0),
-    benefit_perception_std = ifelse(benefit_perception_std > 0, 1, 0),
-    # Convert to factors with the correct levels and labels
-    altruism_potential_std = factor(altruism_potential_std, levels = c(0, 1), labels = c("Low", "High")),
-    benefit_perception_std = factor(benefit_perception_std, levels = c(0, 1), labels = c("Low", "High")),
-    # Recreate moderator levels
-    oth_ori_level = ifelse(oth_ori_std <= -1, "Low (-1 SD)", ifelse(oth_ori_std >= 1, "High (+1 SD)", "Mean")),
-    self_int_level = ifelse(self_int_std <= -1, "Low (-1 SD)", ifelse(self_int_std >= 1, "High (+1 SD)", "Mean"))
+
+
+# Plot Interactions and simple slope analysis
+
+# Standardize the moderator variables to facilitate analysis
+pooled_data$oth_ori_z_std <- scale(pooled_data$oth_ori)
+pooled_data$self_int_z_std <- scale(pooled_data$self_int)
+
+# Fit the Model with Z-standardized Moderator Variables
+
+multilevel_model_rirs_cli_plot <- lmer(eecontlike ~ ee_support_reception + ee_affiliation + ee_relationships + 
+                                  altruism_potential + ee_gain_perception + benefit_perception + 
+                                  age + compage + gender + 
+                                  oth_ori_z_std * altruism_potential + 
+                                  self_int_z_std * benefit_perception + 
+                                  (1 + oth_ori_z_std + self_int_z_std | respondent_id), 
+                                  data = pooled_data, REML = FALSE)
+
+# Summarize and Table the Model, Calculate R-squared
+
+summary(multilevel_model_rirs_cli_plot)
+tab_model(multilevel_model_rirs_cli_plot)
+r_squared <- MuMIn::r.squaredGLMM(multilevel_model_rirs_cli_plot)
+print(r_squared)
+
+# Create Simple Slope Plots
+
+
+## Interaction plot for oth_ori and altruism_potential
+plot_oth_ori_alt_pot <- interact_plot(
+  multilevel_model_rirs_cli_plot, 
+  pred = "altruism_potential", 
+  modx = "oth_ori_z_std",
+  data = pooled_data, 
+  x.label = "Altruism Potential", 
+  y.label = "EE Contribution Likelihood",
+  modx.labels = c("-1 SD", "Mean", "+1 SD"),  
+  colors = c("black", "black", "black"),
+  legend.main = "Other-orientation",
+  plot.points = TRUE
+) + 
+  theme(
+    axis.title = element_text(size = 16),  
+    axis.text = element_text(size = 14),  
+    legend.title = element_text(size = 14),  
+    legend.text = element_text(size = 12)  
   )
 
-# Plotting the interaction between altruism potential and other orientation
-ggplot(plot_data, aes(x = altruism_potential_std, y = eecontlike, color = oth_ori_level, group = oth_ori_level)) +
-  geom_point(alpha = 0.1) +
-  geom_line(aes(linetype = oth_ori_level)) +
-  scale_color_manual(values = c("High (+1 SD)" = "steelblue", "Mean" = "darkgreen", "Low (-1 SD)" = "red")) +
-  scale_linetype_manual(values = c("High (+1 SD)" = "solid", "Mean" = "dashed", "Low (-1 SD)" = "dotted")) +
-  labs(x = "Altruism Potential", y = "EE Contribution Likelihood", color = "Other Orientation Level", linetype = "Other Orientation Level") +
-  theme_minimal() +
-  theme(axis.title = element_text(size = 16),
-        axis.text = element_text(size = 14),
-        legend.title = element_text(size = 14),
-        panel.grid.major = element_blank(),  # Removing all major grid lines
-        plot.title = element_blank())
+ggsave("plot_oth_ori_alt_pot_black.png", plot = plot_oth_ori_alt_pot, device = "png", width = 20, height = 15, units = "cm", dpi = 300)
 
 
-# Plotting the interaction between benefit perception and self interest
-ggplot(plot_data, aes(x = benefit_perception_std, y = eecontlike, color = self_int_level, group = self_int_level)) +
-  geom_point(alpha = 0.1) +
-  geom_line(aes(linetype = self_int_level)) +
-  scale_color_manual(values = c("High (+1 SD)" = "steelblue", "Mean" = "darkgreen", "Low (-1 SD)" = "red")) +
-  scale_linetype_manual(values = c("High (+1 SD)" = "solid", "Mean" = "dashed", "Low (-1 SD)" = "dotted")) +
-  labs(x = "Benefit Perception", y = "EE Contribution Likelihood", color = "Self Interest Level", linetype = "Self Interest Level") +
-  theme_minimal() +
-  theme(axis.title = element_text(size = 16),
-        axis.text = element_text(size = 14),
-        legend.title = element_text(size = 14),
-        panel.grid.major = element_blank(),  # Removing all major grid lines
-        plot.title = element_blank())
+## Interaction plot for self_int and benefit_perception
+plot_self_int_ben_per <- interact_plot(
+  multilevel_model_rirs_cli_plot, 
+  pred = "benefit_perception", 
+  modx = "self_int_z_std",
+  data = pooled_data, 
+  x.label = "Benefit Perception", 
+  y.label = "EE Contribution Likelihood",
+  modx.labels = c("-1 SD", "Mean", "+1 SD"),  
+  colors = c("black", "black", "black"),
+  legend.main = "Self-interest",
+  plot.points = TRUE
+) + 
+  theme(
+    axis.title = element_text(size = 16),  
+    axis.text = element_text(size = 14),  
+    legend.title = element_text(size = 14),  
+    legend.text = element_text(size = 12)  
+  )
+
+ggsave("plot_self_int_ben_per_black.png", plot = plot_self_int_ben_per, device = "png", width = 20, height = 15, units = "cm", dpi = 300)
+
+
+
+
+# Calculate Simple Slope Analyses
+library(reghelper)
+
+simple_slopes(multilevel_model_rirs_cli_plot, pred = c("altruism_potential", "benefit_perception"),
+              modx = c("oth_ori_z_std", "self_int_z_std"), confint = TRUE)
+
 
 
 ```
